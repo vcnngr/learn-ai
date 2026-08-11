@@ -45,7 +45,35 @@ OMP_NUM_THREADS=1  MKL_NUM_THREADS=1  OPENBLAS_NUM_THREADS=1
 Con un thread solo la riduzione è sequenziale e il risultato smette di dipendere da quanti
 core ha la macchina. È nel `Dockerfile`, ed è la riga meno ovvia di tutto il file.
 
-Le divergenze fra macchine sono passate da **42 a 0**. Non «quasi zero»: zero.
+Le divergenze fra la macchina di sviluppo e il container sono passate da **42 a 0**.
+
+### E nemmeno quello basta: c'è la CPU
+
+Con thread e versioni pinnati, lo **stesso container** sul runner GitHub diverge ancora
+dalla macchina di sviluppo. Restano ~34 valori, tutti nei lab che addestrano.
+
+Non è più software: è **hardware**. Due CPU con set di istruzioni diversi fanno scegliere
+a BLAS kernel vettorizzati diversi, e gli arrotondamenti differiscono. Su ventimila passi
+di addestramento la differenza si amplifica.
+
+**Questo non si pinna.** E qui c'erano due strade sbagliate, entrambe tentanti:
+
+| Strada sbagliata | Perché è sbagliata |
+|---|---|
+| allargare la tolleranza finché la CI passa | il rumore fra CPU è più grande degli errori che il gate deve trovare: `694` contro `677` è il 2,5%, e passerebbe. Il gate smetterebbe di controllare qualcosa |
+| dichiarare i lab «non deterministici» e smettere di verificarli | sono deterministici — *dato un ambiente*. Il problema è la definizione di ambiente, non i lab |
+
+La risposta onesta è più stretta: **l'ambiente di riferimento comprende la CPU**, e il gate
+numerico è autoritativo solo dove i numeri sono stati generati.
+
+| Controllo | In CI | In locale (RILASCIO.md) |
+|---|---|---|
+| parity `conti.js` ≡ lab | **duro** — è aritmetica esatta, non dipende dalla CPU | duro |
+| copertura `data-lab` | **duro** — non dipende dai numeri | duro |
+| gate numerico | **informativo** — misura quanto due CPU si allontanano | **duro** |
+
+Il rapporto informativo della CI non è rumore da ignorare: è la misura di quanto il corso
+sia portabile, ed è un numero che prima non avevamo.
 
 **È la lezione di M15 avverata sul corso stesso:** i semi sono condizione necessaria, non
 sufficiente. La contromisura è quella che M15 insegna — dichiarare l'ambiente — portata
