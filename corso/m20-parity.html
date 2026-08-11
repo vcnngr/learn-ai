@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M20 — Parity training / inference</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m20">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M20 · 7 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Parity training / inference</h1>
+<p class="subtitle">Modelli sani che sembrano rotti. Cinque disallineamenti costruiti uno per uno e misurati — nessuno dei quali produce un errore.</p>
+
+<p class="lede">È il modulo più economico del corso e va eseguito <strong>per primo</strong> in ogni diagnosi: nessun addestramento, solo confronti, e chiude un'intera famiglia di ipotesi in poche ore.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Hai addestrato un modello, l'hai valutato, funziona. Lo fondi, lo converti, lo quantizzi e lo metti in produzione. In produzione rende peggio.</p>
+    <ol>
+      <li>Quanti passaggi separano il modello valutato da quello servito?</li>
+      <li>Per trovare dove si rompe, confronti il primo con l'ultimo o i passaggi a due a due?</li>
+      <li>Quale di questi produce un messaggio d'errore: template diverso, temperatura diversa, merge in bf16, quantizzazione a 4 bit?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1. Cinque stadi:</strong> base → base + adattatore vivo → merged → converted → quantized.</p>
+    <p><strong>2. A due a due.</strong> Confrontare il primo con l'ultimo ti dice solo che qualcosa non va. Confrontare ogni passo col precedente ti dice <em>quale</em>: il primo che si discosta è il colpevole.</p>
+    <p><strong>3. Nessuno.</strong> Tutti e quattro sono silenziosi. È il tratto che li accomuna e il motivo per cui questo modulo esiste.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 20.1<br>parity</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_20_1_parity.py</code></pre>
+  </div>
+</div>
+
+<h2>La scala progressiva</h2>
+
+<pre><code>1. base                    il punto di partenza
+2. base + adattatore vivo  come durante l'addestramento
+3. merged                  adattatore fuso nei pesi
+4. converted               altro formato / altro motore
+5. quantized               precisione ridotta per servire</code></pre>
+
+<div class="note nozione">
+  <div class="mark">La regola<br>operativa</div>
+  <div class="body">
+    <p><strong>Non confrontare il passo 1 con il passo 5.</strong> Confronta ogni passo con il <em>precedente</em>, sullo stesso insieme di prompt.</p>
+    <p>Il primo che si discosta oltre tolleranza è il colpevole — e a quel punto hai isolato un problema piccolo invece di averne uno grande e indistinto. È lo stesso principio della scala di isolamento di M02.</p>
+  </div>
+</div>
+
+<h2>I cinque disallineamenti</h2>
+
+<h3>1 · Il template</h3>
+
+<pre><code>addestramento: '&lt;|im_start|&gt;user\\nCiao&lt;|im_end|&gt;\\n&lt;|im_start|&gt;assistant\\n'
+servizio:      '&lt;|im_start|&gt;user\\nCiao&lt;|im_end|&gt;\\n&lt;|im_start|&gt;assistant\\n\\n'
+identici? False   differenza: 1 carattere</code></pre>
+
+<p>Un solo a-capo in più nel prompt di generazione. A occhio i due testi sono identici.</p>
+
+<p><strong>Come si trova:</strong> confronta i due testi con <code>repr()</code>, non stampandoli — la stampa nasconde spazi e a-capo, che sono esattamente ciò che differisce.</p>
+
+<h3>2 · I token speciali aggiunti due volte</h3>
+
+<p>Se il chat template inserisce già il marcatore di inizio e poi il tokenizer lo aggiunge di nuovo, la sequenza ne ha <strong>due</strong>. Il modello non ne ha mai visto uno doppio in addestramento.</p>
+
+<p><strong>Come si trova:</strong> stampa i primi cinque id di una sequenza reale nei due percorsi. Devono coincidere.</p>
+
+<h3>3 · Il campionamento</h3>
+
+<pre data-lab="lab_20_1"><code>configurazione                 p(token 0)   p(token 1)
+temperatura 0 (greedy)             1.0000       0.0000
+temperatura 0.7                    0.5393       0.4053
+temperatura 1.0                    0.4752       0.3891
+temperatura 1.5                    0.3949       0.3456</code></pre>
+
+<p>A temperatura 0 il token 1 <strong>non esce mai</strong>. A temperatura 1,0 esce nel 39% dei casi. <strong>Se valuti in greedy e servi a temperatura 1, stai misurando un modello e servendone un altro.</strong></p>
+
+<p>È il disallineamento più banale e uno dei più frequenti: i default di generazione del motore di inferenza raramente coincidono con quelli usati in valutazione.</p>
+
+<h3>4 · Il merge in precisione ridotta</h3>
+
+<pre data-lab="lab_20_1"><code>come viene fatto il merge                  max|diff| dal vivo
+in float32 (come l'addestramento)                   2.384e-06
+in bfloat16                                         7.727e-03
+in float16                                          1.013e-03</code></pre>
+
+<div class="note errore">
+  <div class="mark">Tre ordini<br>di grandezza</div>
+  <div class="body">
+    <p>Fondere in <code>bf16</code> introduce un errore <strong>3 000 volte</strong> più grande che fondere in <code>fp32</code>. Il numero vale per <em>questo</em> strato, con questi pesi, questo seme e questa scala: è il rapporto misurato sopra, non una costante.</p>
+    <p><strong>Cosa NON segue da qui.</strong> Che su decine di strati l'errore si accumuli, o che la qualità peggiori. Questo lab misura un singolo strato e nessuna uscita di rete: su una pila di strati l'errore può propagarsi, cancellarsi o amplificarsi a seconda di pesi, attivazioni e backend. L'effetto end-to-end è <strong>non verificabile da questo lab</strong>.</p>
+    <p><strong>Regola:</strong> fondi in <code>fp32</code>, poi eventualmente converti i pesi già fusi. Non fondere direttamente nel dtype di servizio.</p>
+  </div>
+</div>
+
+<h3>5 · La quantizzazione post-addestramento</h3>
+
+<p>L'errore sui pesi si trasferisce all'uscita quasi intatto — è lo stesso fenomeno di M14, qui applicato <em>dopo</em> l'addestramento. Se hai valutato il modello fuso in <code>bf16</code> e ne servi uno a 4 bit, <strong>la differenza di qualità che osservi può venire interamente da qui</strong>, non dal fine-tuning.</p>
+
+<h2>Il protocollo</h2>
+
+<p>Per ogni passo della scala, sullo <strong>stesso</strong> insieme di prompt: calcola la metrica al passo <em>N</em>, poi al passo <em>N+1</em>, confronta. Se lo scarto supera la tolleranza, ti fermi lì.</p>
+
+<table>
+<tr><th>Confronto</th><th>Scarto atteso</th></tr>
+<tr><td>base → adattatore all'inizializzazione</td><td><strong>~ 0</strong> — con <code>B</code> a zero (M14)</td></tr>
+<tr><td>adattatore vivo → merged</td><td>rumore numerico, <code>~1e-6</code> in fp32</td></tr>
+<tr><td>merged → converted</td><td>rumore numerico</td></tr>
+<tr><td>converted → quantized</td><td><strong>non trascurabile</strong> — è il prezzo che hai scelto</td></tr>
+</table>
+
+<p>Le prime tre righe <strong>devono</strong> essere quasi nulle. Se non lo sono, hai trovato un bug, non una perdita fisiologica. L'ultima è l'unica dove uno scarto è atteso — ma va <em>misurato e accettato consapevolmente</em>, non scoperto dopo il rilascio.</p>
+
+<h2>Perché viene prima della diagnosi</h2>
+
+<div class="note nozione">
+  <div class="mark">Ordine per<br>informazione<br>/ costo</div>
+  <div class="body">
+    <ol style="margin-bottom:6px">
+      <li><strong>Parity</strong> (questo modulo) — ore, nessun addestramento</li>
+      <li><strong>Template e maschera</strong> (M10) — ore, nessun addestramento</li>
+      <li><strong>Valutazione</strong> (M12) — giorni, nessun addestramento</li>
+      <li><strong>Dati e iperparametri</strong> — settimane, molti addestramenti</li>
+    </ol>
+    <p>Se non escludi il disallineamento <em>prima</em>, rischi di passare settimane a cercare un difetto nei dati mentre il problema è un a-capo nel template di servizio.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Il modello servito rende peggio di quello valutato. Qual è il primo confronto che fai?</li>
+  <li>Il tuo merge dà uno scarto di <code>7e-03</code> dal modello con adattatore vivo. Normale?</li>
+  <li>Valuti in greedy. Quale impostazione devi verificare nel motore di inferenza?</li>
+  <li>Il passo <em>base → adattatore all'init</em> dà uno scarto di 0,4. Cosa significa?</li>
+  <li>Perché questo modulo va eseguito prima di indagare sui dati?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Base contro base + adattatore all'inizializzazione</strong> — deve dare zero. Poi si sale la scala un passo alla volta. Mai il primo contro l'ultimo.</p>
+    <p><strong>2. No, è tremila volte il rumore numerico.</strong> Significa che hai fuso in precisione ridotta. Rifai il merge in <code>fp32</code> e converti dopo.</p>
+    <p><strong>3.</strong> La <strong>temperatura</strong>, e più in generale tutti i parametri di campionamento. A temperatura 0 un token con probabilità 0,39 non esce mai; a temperatura 1 esce due volte su cinque.</p>
+    <p><strong>4.</strong> Che l'adattatore <strong>non è neutro all'inizializzazione</strong>: <code>B</code> non è zero, o stai caricando pesi già addestrati credendo di partire da capo. È la configurazione dell'adattatore, non i dati (M14).</p>
+    <p><strong>5.</strong> Perché costa ore invece di settimane e chiude un'intera famiglia di ipotesi. Cercare nei dati un problema che sta nel template di servizio è il modo più costoso di sbagliare diagnosi.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

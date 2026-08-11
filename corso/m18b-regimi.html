@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M18b — Il tuo hardware: quattro regimi</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m18b">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M18b · 8 h · <span class="pill cpu">CPU · è aritmetica</span></p>
+<h1>Il tuo hardware: quattro regimi</h1>
+<p class="subtitle">Fin qui il corso ha svolto un caso: più schede discrete in un nodo. Questo modulo prende la stessa aritmetica e la porta dove lavori tu.</p>
+
+<p class="lede">Il messaggio è uno solo, e vale la pena anticiparlo: <strong>cambiando regime non cambiano i byte, cambia quale vincolo morde.</strong> La formula di M06 non si tocca mai. Quello che cambia è se contare i byte sia ancora la domanda giusta.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un LoRA su un modello da 27B occupa <strong>55,9 GB statici</strong> — l'hai calcolato in M06.</p>
+    <ol>
+      <li>Entra in una GPU singola da 48 GB?</li>
+      <li>Entra in una macchina a memoria unificata da 128 GB?</li>
+      <li>Le due risposte dipendono dal <em>modello</em> o da qualcos'altro?</li>
+      <li>In quale dei due casi, se entra, puoi dire che «ci girerà bene»?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1. No</strong>, 55,9 &gt; 48. <strong>2. Sì</strong>, 55,9 &lt; 128.</p>
+    <p><strong>3.</strong> Da <em>nessuna</em> proprietà del modello: i byte sono gli stessi, 55,9 in entrambi i casi. Cambia solo il tetto. È il punto del modulo, e sembra banale finché non ci si accorge di quanto spesso si ragiona come se «il modello da 27B» avesse un'unica risposta.</p>
+    <p><strong>4. In nessuno dei due</strong>, e qui sta la parte non ovvia. «Entra» è una risposta dell'aritmetica; «ci gira bene» è una misura, e nel regime a memoria unificata le due divergono di più che altrove — perché lì la capienza è abbondante e a mordere è la <strong>banda</strong>, che nessuna formula di questo corso stima.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 18b.1<br>regimi</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_18b_1_regimi.py
+python3 corso/labs/lab_18b_1_regimi.py --params 8e9 --mostra-tetti</code></pre>
+    <p>Applica l'aritmetica di M06 ai quattro regimi e mostra dove le risposte divergono. Le capienze nel lab sono <strong>esempi</strong>: sostituiscile con quelle della tua macchina — è il solo dato che devi procurarti, e sta nella scheda tecnica.</p>
+  </div>
+</div>
+
+<h2>Lo stesso modello, quattro esiti</h2>
+
+<pre data-lab="lab_18b_1"><code>  regime                  accel.  GB cad.         full         LoRA        QLoRA
+  GPU singola                  1       48    432.0  no     55.9  no     15.4  SI
+  piu' GPU in un nodo          2      141    216.0  no     27.9  SI      7.7  SI
+  memoria unificata            1      128    432.0  no     55.9  SI     15.4  SI
+  cluster multi-nodo           8       80     54.0  SI      7.0  SI      1.9  SI</code></pre>
+
+<div class="note errore">
+  <div class="mark">Leggi le<br>colonne, non<br>le righe</div>
+  <div class="body">
+    <p>Guarda la colonna <strong>LoRA</strong>: <code>55.9</code> su GPU singola e <code>55.9</code> su memoria unificata. <strong>Stesso numero, verdetto opposto.</strong> Nessuna proprietà del modello è cambiata — è cambiato il tetto.</p>
+    <p>E guarda il <code>27.9</code> della seconda riga: è l'unico numero della colonna che differisce, perché è l'unico regime in cui quel <code>/n</code> esiste. Il partizionamento non è una tecnica che puoi sempre applicare: è una proprietà <em>strutturale</em> del regime.</p>
+  </div>
+</div>
+
+<h2>I quattro regimi, e cosa morde in ciascuno</h2>
+
+<table>
+<tr><th>Regime</th><th>L'aritmetica decide</th><th>Quello che decide davvero</th></tr>
+<tr>
+  <td><strong>GPU singola</strong><br><span class="pill opt">workstation</span></td>
+  <td>La capienza, e basta.</td>
+  <td>Niente da partizionare. Le leve sono quantizzare la base (M14), ridurre gli addestrabili, o le attivazioni (M07). Le stesse di sempre — ma qui sono le <strong>uniche</strong>.</td>
+</tr>
+<tr>
+  <td><strong>Più GPU in un nodo</strong><br><span class="pill opt">il caso svolto</span></td>
+  <td>La capienza per scheda, dopo aver scelto la strategia (M18).</td>
+  <td>Quanto costa la comunicazione, che dipende dalla sovrapposizione col calcolo. Si misura.</td>
+</tr>
+<tr>
+  <td><strong>Memoria unificata</strong><br><span class="pill opt">DGX Spark, Grace</span></td>
+  <td>Poco: la capienza è grande e quasi mai il vincolo.</td>
+  <td><strong>La banda.</strong> La stessa memoria che ti fa entrare il modello è molto più lenta della HBM di una scheda discreta.</td>
+</tr>
+<tr>
+  <td><strong>Cluster multi-nodo</strong><br><span class="pill opt">HPC</span></td>
+  <td>La capienza aggregata, quasi sempre sufficiente.</td>
+  <td>La <strong>rete</strong> fra nodi e la <strong>coda</strong>. Il tempo di attesa non è tempo di calcolo, ma è tempo.</td>
+</tr>
+<tr>
+  <td><strong>GPU a noleggio</strong><br><span class="pill opt">effimere</span></td>
+  <td>La stessa aritmetica del regime che stai affittando.</td>
+  <td>Il <strong>trasferimento</strong> e l'<strong>effimero</strong>: dataset e checkpoint da spostare a ogni run, e l'istanza che può sparire a metà.</td>
+</tr>
+</table>
+
+<h3>Memoria unificata: perché rompe il modello mentale</h3>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Su schede discrete la memoria dell'acceleratore è <strong>separata</strong> da quella della CPU, e per usarla i dati vanno copiati. È il modello su cui è costruito tutto M06: un tetto per scheda, e la somma che non è un pool.</p>
+    <p>Su una macchina a memoria unificata c'è <strong>un solo pool fisico</strong>, indirizzato sia dalla CPU sia dall'acceleratore. La copia sparisce. E con lei sparisce anche il ragionamento «ci sta nella VRAM?», perché la VRAM come oggetto separato non esiste.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Due conseguenze<br>opposte, ed<br>entrambe vere</div>
+  <div class="body">
+    <p><strong>A favore:</strong> entrano modelli che su una scheda discreta di pari prezzo non entrerebbero, e senza partizionare niente. Per il fine-tuning con LoRA è una posizione comoda.</p>
+    <p><strong>Contro:</strong> quella memoria ha una banda molto inferiore alla HBM, e l'addestramento è un carico che la memoria la satura. «Entra» e «ci gira in tempi utili» divergono più che in qualsiasi altro regime.</p>
+    <p><strong>Cosa NON puoi dedurre da questo corso:</strong> di quanto. La banda non entra in nessuna formula di M06, e non ho una misura da darti. La procedura corretta è quella di M07: <em>misura il tempo per passo a batch crescente e guarda dove smette di scalare</em>. Se si appiattisce presto, sei limitato dalla banda, non dal calcolo.</p>
+    <p>Il conto della memoria, però, ti serve lo stesso — e il <strong>pool è condiviso col sistema operativo e con la CPU</strong>. Un modello che occupa il 100% del pool non entra, indipendentemente da cosa dica l'aritmetica.</p>
+  </div>
+</div>
+
+<h3>Cluster: la riga «ideale» è più ottimistica che altrove</h3>
+
+<p>La riga ZeRO-3 di M18 assume divisione perfetta e ignora i buffer di comunicazione. Su un nodo solo è un'approssimazione ragionevole. Su più nodi no: l'all-gather dei pesi attraversa la <strong>rete</strong> invece dell'interconnessione interna, e il costo cambia di ordine di grandezza.</p>
+
+<p>Il criterio pratico che ne segue: <strong>il tensor parallel resta dentro il nodo</strong>, gli altri paralleli attraversano i nodi. È la stessa regola di M18, ma qui smette di essere teorica.</p>
+
+<h3>Noleggio: il vincolo non è quasi mai la memoria</h3>
+
+<div class="note ponte">
+  <div class="mark">Ponte</div>
+  <div class="body">
+    <p>È il regime in cui il tuo mestiere conta di più e la matematica di meno. Le domande sono di infrastruttura: quanto ci mette il dataset ad arrivare, dove finiscono i checkpoint, cosa succede se l'istanza viene revocata a metà epoca.</p>
+    <p>La conseguenza sul corso: <strong>il manifest di M15 smette di essere buona pratica e diventa la condizione per non perdere il lavoro.</strong> Su una macchina che possiedi puoi sempre tornare a chiederle che versione aveva. Su un'istanza effimera, dopo, non c'è più nessuno a cui chiedere.</p>
+  </div>
+</div>
+
+<h2>Il tuo profilo, sui quattro regimi</h2>
+
+<p>Il campo <code>regime</code> in <code>assets/profilo.js</code> determina quale logica di capienza si applica ai ricalcoli che vedi in M06. Se l'hai compilato, il blocco qui sotto è già il tuo caso.</p>
+
+<div data-conto="lora"></div>
+
+<h2>Tre previsioni sul tuo hardware, e come smentirle</h2>
+
+<p>Quello che hai letto finora è <strong>teoria</strong>: l'aritmetica dei byte, che è la stessa ovunque, e la struttura dei quattro regimi. Non è esperienza misurata su una Spark, su un cluster o su un'istanza a noleggio — quelle macchine non le ho.</p>
+
+<p>La divisione del lavoro è esplicita, ed è il motivo per cui questo modulo finisce così invece che con una raccomandazione:</p>
+
+<div class="note nozione">
+  <div class="mark">Chi fa<br>cosa</div>
+  <div class="body">
+    <p><strong>Il corso dichiara</strong> la teoria, e dichiara cosa non ha verificato.<br>
+    <strong>Tu esegui e misuri</strong> sul tuo hardware.<br>
+    <strong>Se la previsione è sbagliata, si corregge il corso</strong> — non si corregge la misura.</p>
+    <p>Una teoria che non dice come si potrebbe smentirla non è una teoria: è un'opinione con dei numeri accanto.</p>
+  </div>
+</div>
+
+<p>Il lab genera le tre previsioni per la <em>tua</em> macchina, con il criterio di falsificazione scritto accanto a ciascuna:</p>
+
+<pre><code>python3 corso/labs/lab_18b_1_regimi.py \
+        --regime unificata --accel 1 --gb 128 --params 8e9 --metodo lora</code></pre>
+
+<table>
+<tr><th>Previsione</th><th>Come la testi</th><th>Mi smentisci se</th></tr>
+<tr>
+  <td><strong>1. La capienza statica</strong><br>tot GB per acceleratore, ci sta o no</td>
+  <td>Lanci l'addestramento e guardi se parte.</td>
+  <td>Va in OOM quando prevedevo che entrasse — o parte quando prevedevo di no. <em>Un OOM a batch grande non conta:</em> le attivazioni non sono in quel conto.</td>
+</tr>
+<tr>
+  <td><strong>2. Il picco misurato sarà più alto</strong><br>attivazioni, buffer, sistema</td>
+  <td><code>max_memory_allocated()</code> a fine passo — il codice è in <code>lab_07_1</code> sez. 4.</td>
+  <td>Il picco è <em>uguale o minore</em> del conto statico. Allora sto contando qualcosa che non c'è.</td>
+</tr>
+<tr>
+  <td><strong>3. Quello che morde nel tuo regime</strong><br>banda, rete, replica, trasferimento</td>
+  <td>Dipende dal regime: il lab stampa la misura esatta da fare.</td>
+  <td>Il vincolo che morde è un altro. È la previsione più esposta delle tre, ed è quella che vale la pena attaccare.</td>
+</tr>
+</table>
+
+<div class="note errore">
+  <div class="mark">Se una<br>di queste<br>è sbagliata,<br>il corso lo è</div>
+  <div class="body">
+    <p>Non è una formula di cortesia. Sono affermazioni non verificate su hardware come il tuo, ed è scritto in <code>AMBIENTI.md</code> quali celle della matrice sono ancora vuote.</p>
+    <p>Il lab stampa una scheda da compilare — regime, acceleratori, versioni, esito delle tre previsioni, numeri misurati. <strong>Una previsione smentita vale più di dieci confermate:</strong> quella corregge il corso, le altre lo lasciano dov'è.</p>
+  </div>
+</div>
+
+<h3>Quello che resta comunque fuori</h3>
+
+<ul>
+  <li><strong>Nessun numero di banda, latenza o throughput.</strong> Dipendono da hardware che non ho, e inventarli sarebbe l'errore che il corso insegna a non fare. Le capienze nel lab sono esempi da sostituire con i tuoi.</li>
+  <li><strong>Nessuna raccomandazione su quale regime scegliere.</strong> Dipende da vincoli — budget, dati che non possono uscire, tempi di consegna — che non sono in questo corso e non lo saranno.</li>
+</ul>
+
+<p>Quello che il modulo dà è più stretto e si trasferisce: <strong>saper riconoscere in quale regime sei, e quindi quale domanda porti.</strong> Contare i byte vale identico in tutti e quattro. Sapere se contarli sia <em>la</em> domanda, no.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Un LoRA occupa 55,9 GB statici. Su quale dei quattro regimi entra, e perché la risposta non dipende dal modello?</li>
+  <li>Sei su una macchina a memoria unificata e il modello entra al 70% del pool. Puoi cominciare?</li>
+  <li>Su cluster, la riga «ZeRO-3 ideale» di M18 è più o meno affidabile che su un nodo solo?</li>
+  <li>Affitti una GPU per un fine-tuning di tre giorni. Qual è la prima cosa da fare, prima di lanciare?</li>
+  <li>Il tuo tempo per passo su memoria unificata smette di migliorare aumentando il batch. Cosa concludi?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Su tutti tranne la GPU singola da 48 GB. La risposta non dipende dal modello perché i byte sono gli stessi ovunque: dipende dal <em>tetto</em> e dall'esistenza del <code>/n</code>.</p>
+    <p><strong>2. Sì, ma il conto non è finito.</strong> Il pool è condiviso con CPU e sistema operativo, e le attivazioni (M07) non sono in quel 70%: crescono con batch e sequenza. Il margine reale è più stretto di quanto sembri.</p>
+    <p><strong>3. Meno affidabile.</strong> Assume divisione perfetta e ignora i buffer, ma su più nodi l'all-gather passa dalla rete: l'ottimismo che su un nodo è un'approssimazione, fra nodi diventa un errore di ordine di grandezza.</p>
+    <p><strong>4. Il manifest di M15</strong> — versioni, driver, sha del dataset, semi — <em>prima</em> di lanciare. Su un'istanza effimera non esiste un «dopo» in cui chiederglielo.</p>
+    <p><strong>5.</strong> Che sei limitato dalla <strong>banda</strong>, non dal calcolo. È il segnale atteso in quel regime, e la conseguenza pratica è che le ottimizzazioni sulla memoria non ti daranno velocità: quella la daranno meno byte mossi per passo.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La risposta che le lega tutte: <strong>l'aritmetica è invariante, la domanda no.</strong> Il corso ti ha dato la prima; questo modulo esiste perché la seconda non venga data per scontata.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/conti.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

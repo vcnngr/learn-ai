@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M21 — Diagnosi di un fine-tuning deludente</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m21">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M21 · 13 h · <span class="pill cpu">CPU per il protocollo</span><span class="pill gpu">GPU per gli esperimenti</span></p>
+<h1>Diagnosi di un fine-tuning deludente</h1>
+<p class="subtitle">Il modulo che chiude il percorso. Non aggiunge una tecnica: mette in ordine le venti precedenti, e l'ordine è la cosa che distingue una diagnosi da una serie di tentativi.</p>
+
+<p class="lede">Un modello che rende meno del previsto non ha un sintomo che identifica la causa. Ha <strong>una dozzina di cause possibili che producono lo stesso sintomo</strong>. Il metodo non è indovinare quale: è escluderle in ordine di costo, una alla volta, con un criterio scritto prima.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un adattatore addestrato su un modello denso rende meno del previsto. Hai in mente sei possibili cause: dati insufficienti, rango troppo basso, learning rate sbagliato, template disallineato, maschera della loss errata, valutazione poco affidabile.</p>
+    <ol>
+      <li>In che <strong>ordine</strong> le verifichi?</li>
+      <li>Su quale criterio hai scelto quell'ordine?</li>
+      <li>Cosa scrivi <em>prima</em> di eseguire il primo esperimento?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1 e 2.</strong> In ordine di <strong>costo</strong>, non di probabilità. Un'ipotesi che si esclude in ore va provata prima di una che costa settimane, <em>anche se sembra meno probabile</em>.</p>
+    <pre><code>1. disallineamento addestramento/inferenza   ore, nessun addestramento
+2. adattatore non neutro all'init            minuti
+3. chat template diverso                     ore
+4. maschera della loss sfasata               ore
+5. la valutazione non misura quello che credi  giorni, nessun addestramento
+6. batch effettivo / learning rate            ore
+7. regime sbagliato (conoscenza vs comportamento)  giorni
+8. rango insufficiente                       giorni, più addestramenti
+9. dati insufficienti                        settimane</code></pre>
+    <p>Nota dove finiscono «dati» e «rango»: <strong>in fondo</strong>. Sono le ipotesi più interessanti e le più costose, ed è esattamente il motivo per cui non si parte da lì.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Da dove viene questa lista, e da dove non viene.</strong> Minuti, ore, giorni e settimane non escono da nessun lab: sono la stima dell'autore per <em>questo</em> caso di studio, e con essa cade anche l'ordine. Il costo di un'ipotesi dipende da cosa hai già in casa — artefatti, automazione, dimensione dei run, stack, organizzazione — e cambia l'ordine in modo non piccolo.</p>
+    <p>Due esempi concreti di ribaltamento: se hai una valutazione già pronta e strumentata, il punto 5 costa un pomeriggio invece che giorni e sale in cima; se invece devi ricostruire una parity senza manifest (M15, M20), il punto 1 può costare più di uno sweep sul rango, e scende.</p>
+    <p><strong>Quello che va trasferito è il metodo, non l'ordine.</strong> Per ogni ipotesi stima due cose nel tuo contesto — <em>quanto costa escluderla</em> e <em>quanto discrimina</em>, cioè quante altre ipotesi cade con lei — e ordina con quei due valori. Dove non hai dati di costo, scrivi «non verificabile» e misuralo la prima volta che ci passi: la seconda diagnosi parte già ordinata sui tuoi numeri.</p>
+    <p><strong>3.</strong> Il <strong>criterio di decisione</strong>: quale risultato esclude l'ipotesi e quale la conferma. Se lo scrivi dopo aver visto il risultato, non stai falsificando un'ipotesi — la stai interpretando.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 21.1<br>protocollo</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_21_1_diagnosi.py
+python3 corso/labs/lab_21_1_diagnosi.py --scheda   # solo la scheda da compilare</code></pre>
+    <p>Le nove ipotesi con esperimento e criterio, la scheda da compilare, e gli anti-pattern.</p>
+  </div>
+</div>
+
+<h2>Prima delle ipotesi: c'è davvero un fenomeno?</h2>
+
+<div class="note errore">
+  <div class="mark">Il passo<br>zero</div>
+  <div class="body">
+    <p>Prima di cercare una causa, verifica di avere qualcosa da spiegare:</p>
+    <ul>
+      <li>Con quale <strong>metrica</strong> hai misurato «rende meno», su quale insieme?</li>
+      <li>Quanto vale la stessa metrica sul <strong>modello base</strong>?</li>
+      <li>Qual è l'<strong>intervallo di confidenza</strong> della differenza?</li>
+    </ul>
+    <p><strong>Se quell'intervallo contiene lo zero, fermati — ma fermati sulla cosa giusta.</strong> Non significa che il fenomeno non esista: significa che <em>non hai evidenza sufficiente per attribuirgli una causa</em>. Sono due affermazioni diverse, e confonderle è esattamente l'errore che M12 insegna a non fare.</p>
+    <p>Il numero lo hai già visto lì: con una differenza <em>vera</em> di 3,3 punti, 500 esempi la rilevano solo nel 32% dei casi. Un intervallo che contiene lo zero è compatibile sia con l'assenza di effetto sia con un effetto reale che non hai abbastanza esempi per vedere.</p>
+    <p>Quindi la mossa non è archiviare il problema: è <strong>decidere quale differenza minima ti interessa e ridisegnare la valutazione perché possa rilevarla</strong>. Solo dopo la caccia alla causa ha senso — cercare la causa di una differenza non dimostrata è il modo più elegante di sprecare un mese.</p>
+  </div>
+</div>
+
+<h2>Gli artefatti decidono cosa è verificabile</h2>
+
+<pre><code>ARTEFATTI DISPONIBILI                                  sì / no
+  manifest dell'addestramento                          ______
+  sha256 del dataset                                   ______
+  revisione esatta del modello base                    ______
+  template renderizzato salvato come testo             ______
+  semi (pesi, ordine dati, dropout)                    ______
+  checkpoint valutato, identificato senza ambiguità    ______
+  configurazione di inferenza usata in valutazione     ______</code></pre>
+
+<p><strong>Ogni «no» rimuove ipotesi dalla lista dei verificabili</strong>, e va segnalato esplicitamente. Non è un dettaglio burocratico: se non sai quale checkpoint hai valutato, l'ipotesi «ho valutato il checkpoint sbagliato» non è né confermabile né escludibile, e resterà aperta per sempre.</p>
+
+<p>È il motivo per cui M15 viene prima di questo modulo: il manifest non serve a essere ordinati, serve a rendere <em>possibile</em> la diagnosi.</p>
+
+<h2>La regola che tiene in piedi tutto</h2>
+
+<div class="note nozione">
+  <div class="mark">Una<br>alla volta</div>
+  <div class="body">
+    <p><strong>Ogni ipotesi si esclude prima di passare alla successiva.</strong> Un test eseguito mentre un'ipotesi precedente è ancora aperta non isola niente.</p>
+    <p>È la scala di isolamento di M02, applicata al livello più alto: se il template è disallineato, il risultato dell'esperimento sul rango non è interpretabile — non perché sia sbagliato, ma perché stai misurando due cose insieme.</p>
+  </div>
+</div>
+
+<h2>I tre esiti, tutti accettabili</h2>
+
+<table>
+<tr><th>Esito</th><th>Cosa significa, e cosa fai</th></tr>
+<tr><td><strong>1. Causa identificata</strong></td><td>Un'ipotesi confermata da un esperimento che l'avrebbe potuta falsificare. Correggi, rifai il run, verifica che il sintomo sparisca. <strong>Se non sparisce, la causa era un'altra</strong>: torni alla lista.</td></tr>
+<tr><td><strong>2. Cause eliminate, nessuna confermata</strong></td><td>Non è un fallimento. Hai ristretto lo spazio e sai cosa <em>non</em> è. Il risultato utile è: lista aggiornata, evidenza raccolta, prossimo esperimento discriminante identificato.</td></tr>
+<tr><td><strong>3. Non determinabile</strong></td><td>Mancano artefatti, il run non è riproducibile, o più cause sono compatibili con l'evidenza. La conclusione onesta è «si rifà tracciando tutto» — e la prima cosa da produrre è il manifest di M15, non un altro addestramento alla cieca.</td></tr>
+</table>
+
+<p><strong>Un esito 2 o 3 dichiarato esplicitamente vale più di un esito 1 inventato.</strong> La diagnosi non è un rito che deve finire con un colpevole.</p>
+
+<h2>Il protocollo, applicato per intero</h2>
+
+<p>Fin qui il modulo ha descritto un metodo. Il lab 21.2 lo <strong>esegue</strong> su un fine-tuning rotto in un punto noto — noto a chi l'ha scritto, non a chi lo diagnostica. La risposta esiste, così puoi controllare che il protocollo la trovi <em>prima</em> di applicarlo a un caso in cui nessuno la conosce.</p>
+
+<div class="note lab">
+  <div class="mark">Lab 21.2<br>caso svolto</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_21_2_caso.py</code></pre>
+    <p>Sessanta servizi con una porta ciascuno. Un modello che già rispondeva bene, un fine-tuning aggiuntivo che lo peggiora, e nessuno sa perché. Gira in una ventina di secondi su CPU, deterministico.</p>
+  </div>
+</div>
+
+<h3>Passo zero — c'è davvero un fenomeno?</h3>
+
+<pre data-lab="lab_21_2"><code>modello                      accuratezza esatta
+modello di partenza                      88.3%
+dopo il fine-tuning                      60.0%
+
+differenza appaiata                     -28.3%
+IC 95% della differenza    [-0.417, -0.167]
+l'intervallo contiene lo zero?  NO</code></pre>
+
+<p>L'intervallo esclude lo zero: c'è qualcosa da spiegare, e si può procedere. Se lo avesse contenuto, la prima cosa da fare sarebbe stata ridisegnare la valutazione (M12) — non cercare una causa.</p>
+
+<h3>Le ipotesi, una alla volta</h3>
+
+<p>Le prime tre vengono escluse, la quarta confermata. Il criterio di decisione è scritto <em>prima</em> del risultato, in ogni caso: nel lab lo trovi come stringa stampata sopra il numero che deve giudicare.</p>
+
+<pre data-lab="lab_21_2"><code> pos  bersaglio   usata dal caso    attesa
+  18        '3'                0         1
+  19        '9'                1         1
+  20        '6'                1         1
+  21        '1'                1         1
+
+posizioni attive nel caso   [19, 20, 21]  -> supervisiona '961'
+posizioni attive attese     [18, 19, 20, 21]  -> supervisiona '3961'
+quante attive: caso 3, attese 4</code></pre>
+
+<div class="note errore">
+  <div class="mark">Perché il<br>conteggio<br>non basta</div>
+  <div class="body">
+    <p>La maschera parte <strong>una posizione troppo avanti</strong>. Il modello non riceve mai segnale sulla prima cifra della porta: quella la deve indovinare. Con quattro cifre, sbagliarne una basta a fallire l'intera risposta.</p>
+    <p>Il criterio scritto prima diceva «guarda <em>quali</em> posizioni contribuiscono, non quante» — e serviva: una maschera sfasata può avere il numero giusto di posizioni attive e coprire quelle sbagliate. Qui il conteggio (3 contro 4) aiuta, ma è un caso fortunato.</p>
+    <p>E la training loss di quel run <strong>scendeva regolarmente</strong>: stava imparando benissimo le tre cifre che le venivano insegnate. La curva non poteva dirtelo.</p>
+  </div>
+</div>
+
+<h3>La correzione, e la verifica che il sintomo sparisca</h3>
+
+<pre data-lab="lab_21_2"><code>modello                          accuratezza esatta
+base                                         88.3%
+SFT con maschera sfasata                     60.0%
+SFT con maschera corretta                   100.0%
+
+differenza corretto - rotto                +40.0%
+IC 95% della differenza       [+0.283, +0.517]</code></pre>
+
+<p>Stesso addestramento, <strong>una sola cosa cambiata</strong>: la maschera. Stesso seme, stessi dati, stessi passi, stesso learning rate. Una correzione che ne cambia due insieme non verifica niente — è il primo anti-pattern qui sotto.</p>
+
+<div class="note errore">
+  <div class="mark">Due controlli<br>che non<br>potevano<br>fallire</div>
+  <div class="body">
+    <p>Nel lab le ipotesi 1 (disallineamento addestramento/inferenza) e 3 (chat template) risultano <em>escluse</em> — ma passavano <strong>per costruzione</strong>, e il lab lo dichiara sotto ciascuna.</p>
+    <p>Quel modellino non ha dropout né normalizzazioni con statistiche di batch, quindi <code>train()</code> ed <code>eval()</code> calcolano la stessa funzione; e i due testi del template escono dalla stessa costante. <strong>Un controllo che non può fallire non è evidenza.</strong></p>
+    <p>Sono mostrati per il <em>codice</em> che serve a eseguirli, non come prova. Su un modello vero — con dropout attivo, una scala di parity fra base, merged, converted e quantized (M20), e due sorgenti davvero indipendenti per il template (M10) — lo stesso test ha un esito che non si conosce in anticipo. È lì che diventa informativo, ed è per questo che quelle due ipotesi stanno così in alto nella lista.</p>
+  </div>
+</div>
+
+<p><strong>Cosa il lab non dimostra:</strong> niente sulla frequenza dei guasti reali. Qui il difetto è uno solo, messo lì apposta, e tutti gli artefatti erano presenti. Un caso vero può avere più cause insieme, artefatti mancanti, e finire negli esiti 2 o 3 invece che nell'1.</p>
+
+<h2>Come non si fa</h2>
+
+<div class="note errore">
+  <div class="mark">Quattro<br>anti-pattern<br>che sembrano<br>ragionevoli</div>
+  <div class="body">
+    <p><strong>Cambiare più cose insieme.</strong> «Alzo il rango, abbasso il learning rate e aggiungo dati.» Se migliora non sai quale delle tre; se peggiora nemmeno. Sembra efficiente perché risparmia run: costa più tempo.</p>
+    <p><strong>Partire dall'ipotesi più interessante.</strong> Il rango è più interessante di un a-capo nel template. Ma l'a-capo si esclude in un'ora e il rango in una settimana. L'ordine è per costo, non per curiosità.</p>
+    <p><strong>Leggere il risultato e poi decidere cosa significa.</strong> Senza criterio scritto prima, qualunque risultato conferma l'ipotesi che avevi in mente.</p>
+    <p><strong>Dedurre la causa dal sintomo.</strong> Le cause producono sintomi che si somigliano. Si distinguono con un <em>intervento</em> che ne elimina una alla volta, non con una tabella sintomo → causa. È la lezione di M02, e qui vale più che altrove.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">E soprattutto:<br>non fidarti<br>della training loss</div>
+  <div class="body">
+    <p>Scende regolarmente in <strong>tutti</strong> gli scenari rotti che hai costruito nel corso:</p>
+    <ul>
+      <li>template completamente sbagliato — <strong>M10</strong></li>
+      <li>maschera sfasata di una posizione — <strong>M11</strong></li>
+      <li>regime sbagliato, formato appreso e contenuto no — <strong>M13</strong></li>
+      <li>DPO con margine ottimo e modello peggiorato — <strong>M16</strong></li>
+      <li>router MoE sbilanciato — <strong>M19</strong></li>
+    </ul>
+    <p>Cinque guasti diversi, cinque curve di loss dall'aspetto sano.</p>
+  </div>
+</div>
+
+<h2>Dove ogni strumento è stato costruito</h2>
+
+<pre><code>leggere i pesi di un checkpoint                          M04
+calcolare la memoria prima di lanciare                   M06
+misurare il termine statico e le attivazioni             M07
+diagnosticare una loss curve                             M08
+verificare un'implementazione contro il riferimento      M09
+ispezionare template e maschera token per token          M10
+validare un dataset, dedup, contaminazione               M11
+intervalli di confidenza, confronto appaiato             M12
+distinguere conoscenza da comportamento                  M13
+contare i parametri LoRA, verificare il merge            M14
+manifest e riproducibilità                               M15
+leggere le metriche di un DPO                            M16
+scegliere fra RL e distillazione                         M17
+memoria per rank e scaling                               M18
+metriche di routing MoE                                  M19
+scala di parity                                          M20</code></pre>
+
+<p><strong>Nessuno di questi strumenti è nuovo.</strong> Questo modulo non ne aggiunge: aggiunge l'ordine in cui usarli.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Il tuo modello rende «peggio». Qual è la prima cosa da verificare, prima ancora di formulare ipotesi?</li>
+  <li>Perché «dati insufficienti» sta in fondo alla lista e non in cima?</li>
+  <li>Non hai il manifest del run. Cosa cambia nella diagnosi?</li>
+  <li>Escludi cinque ipotesi su nove e nessuna è confermata. Hai fallito?</li>
+  <li>La training loss scendeva regolarmente. Quante ipotesi questo esclude?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Che la differenza <strong>esista</strong>: intervallo di confidenza sulla differenza rispetto alla baseline, confronto appaiato, stesso insieme. Se contiene lo zero non hai evidenza sufficiente per attribuire una causa: prima ridisegna la valutazione (M12), non archiviare il problema.</p>
+    <p><strong>2.</strong> Perché <em>in questo caso di studio</em> costa <strong>settimane</strong> e molti addestramenti, mentre le prime quattro costano ore. L'ordine è per costo — con i costi stimati nel tuo contesto, non con quelli scritti qui. E capita spesso di non arrivarci mai, perché la causa era al punto 1 o 3.</p>
+    <p><strong>3.</strong> Diverse ipotesi diventano <strong>non verificabili</strong> — non «difficili»: non decidibili con l'evidenza disponibile. La conclusione onesta è l'esito 3, e la prima azione è produrre il manifest (M15), non lanciare un altro run.</p>
+    <p><strong>4. No.</strong> È l'esito 2: hai ristretto lo spazio e sai cosa non è. Il risultato utile è la lista aggiornata più il prossimo esperimento discriminante.</p>
+    <p><strong>5. Nessuna.</strong> La training loss scende in tutti e cinque gli scenari rotti costruiti nel corso. Non è evidenza a favore di niente.</p>
+  </div>
+</details>
+
+<h2>Fine del percorso</h2>
+
+<p>Se sei arrivato qui avendo fatto i lab e non solo letto, adesso sai: aprire un checkpoint e contarne i parametri, calcolare la memoria prima di lanciare, scrivere un transformer e verificarlo contro il riferimento, costruire una valutazione che regge statisticamente, scegliere un metodo sapendo dire quando è sbagliato, e diagnosticare un fallimento per esclusione ordinata.</p>
+
+<p>Restano fuori le cose dichiarate all'inizio, e continuano a restarne fuori: il pretraining a scala vera, i guasti che emergono solo dopo giorni di run, il giudizio che si forma su cluster che non hai. <strong>Il corso non ti ha reso un ricercatore</strong> — ti ha reso qualcuno che può leggere quello che i ricercatori scrivono e verificarlo sulla propria macchina.</p>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

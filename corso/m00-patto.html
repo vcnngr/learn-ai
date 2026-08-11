@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M00 — Come si usa questo corso</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m00">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M00 · 0,5 h · <span class="pill cpu">CPU</span></p>
+<h1>Come si usa questo corso</h1>
+<p class="subtitle">Dieci minuti. Salta questa pagina e tutto il resto funziona peggio.</p>
+
+<h2>Il patto</h2>
+
+<p class="lede">Tre impegni, in ordine di importanza. Il primo è mio, il secondo è tuo, il terzo tiene in piedi il resto.</p>
+
+<h3>1. Non presuppongo niente</h3>
+<p>Ogni simbolo matematico che compare viene definito prima di essere usato. Ogni sigla viene sciolta la prima volta. Se incontri un termine mai spiegato, <strong>è un mio errore, non una tua lacuna</strong>: segnalamelo e riscrivo la pagina.</p>
+
+<h3>2. «Non lo so» è una risposta completa</h3>
+<p>Le domande che trovi prima delle spiegazioni non sono un esame. Servono a farti notare un buco un istante prima che io lo riempia: quello che arriva dopo un tentativo si fissa, quello che arriva a freddo scivola via.</p>
+<p>Se non sai, scrivi «non lo so», apri la risposta, vai avanti. Costo zero. L'unico modo di sbagliare qui è saltare il tentativo <em>e</em> convincersi di aver capito.</p>
+
+<h3>3. Ogni concetto astratto finisce in un <code>print()</code></h3>
+<p>Se ti parlo di «gradiente», da qualche parte nella stessa pagina c'è il tensore che lo contiene, con nome, forma e la riga esatta per stamparlo. Se non c'è, il concetto non è ancora tuo — ed è un difetto della pagina.</p>
+
+<h2>Come si legge una pagina</h2>
+
+<p>Cinque tipi di annotazione, sempre gli stessi, sempre con lo stesso significato. Il colore non è decorativo: <span style="color:var(--signal)"><strong>blu</strong></span> è ciò che è noto e strutturale, <span style="color:var(--delta)"><strong>rosso</strong></span> è lo scarto fra quello che credi e quello che è, <span style="color:var(--verify)"><strong>verde</strong></span> è ciò che hai eseguito e verificato.</p>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Un fatto convenzionale: un formato di file, un nome, una notazione. Non c'è niente da intuire — sono decisioni prese da altri, che vanno solo imparate.</p>
+    <p>Le do compatte e si passa oltre. Costruirci sopra un indovinello sarebbe finto, e ti farebbe perdere tempo su un enigma che non insegna nulla.</p>
+  </div>
+</div>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Prima di eseguire qualsiasi cosa, dichiari cosa ti aspetti: quanta memoria, che forma avrà un tensore, quanto ci metterà, cosa comparirà nei log. Poi esegui, e confronti.</p>
+    <p><strong>È il meccanismo di verifica principale del corso</strong>, più delle domande aperte. Una previsione sbagliata individua il punto preciso in cui il tuo modello mentale diverge dalla realtà. Una risposta vaga non individua niente.</p>
+    <p>Tirare a indovinare va benissimo: serve lo scarto, non la precisione.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab</div>
+  <div class="body">
+    <p>Codice che lanci davvero, non pseudocodice. Ogni lab dichiara dove gira: <span class="pill cpu">CPU</span> sul portatile, <span class="pill gpu">GPU</span> sul nodo di addestramento.</p>
+    <p>Gli script stanno in <code>corso/labs/</code> e sono autonomi: nessun framework, nessuna installazione oltre a quello che hai già.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Errore comune</div>
+  <div class="body">
+    <p>Una trappola in cui cadono tutti, e spesso proprio chi arriva dall'infrastruttura, perché un riflesso corretto nel suo mondo diventa sbagliato qui.</p>
+    <p>Queste valgono più della teoria che le circonda: leggile anche se hai fretta.</p>
+  </div>
+</div>
+
+<div class="note ponte">
+  <div class="mark">Ponte</div>
+  <div class="body">
+    <p>Un collegamento con quello che già sai: Linux, storage, rete, scheduling, container.</p>
+    <p>Uso questi ponti solo quando reggono davvero. <strong>Quando un concetto non ha equivalente sistemistico te lo dico</strong>, e lo spiego per quello che è, invece di forzare un'analogia che poi ti fa sbagliare i conti.</p>
+  </div>
+</div>
+
+<p>E poi ci sono le risposte, chiuse per default:</p>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p>Dentro trovi la soluzione, il ragionamento, e — quando serve — <strong>da dove nasce tipicamente l'errore</strong>: non solo cosa era giusto, ma quale convinzione ti ha portato altrove.</p>
+    <p>Aprile dopo aver provato, o dopo aver deciso che non sai. Nessuno controlla: barare qui significa solo sprecare il proprio tempo.</p>
+  </div>
+</details>
+
+<h2>Il metodo, in una riga</h2>
+
+<p class="lede" style="font-family:var(--display); font-weight:700; font-size:1.2rem; line-height:1.5">Domanda → tuo tentativo → correzione con il perché dell'errore → teoria minima → esercizio sulle tue macchine.</p>
+
+<p>Sempre in quest'ordine, con una sola eccezione: le <em>Nozioni</em>. Quando l'argomento è puramente convenzionale non c'è niente da inferire, e la do diretta.</p>
+
+<p>La matematica non viene evitata né saltata. Arriva quando serve a spiegare qualcosa che <em>vedi</em>: una loss che non scende, un errore di memoria, un gradiente che esplode. Ogni formula viene sempre con tre cose: che cosa misura, cosa succede se cambi un termine, e come lo osservi nei log di un addestramento vero.</p>
+
+<h2>Cosa serve installato</h2>
+
+<p>Per la Parte I e la Parte II basta un portatile. Il controllo veloce:</p>
+
+<pre><code>python3 -c "import torch, numpy, safetensors; print(torch.__version__)"</code></pre>
+
+<p>Se stampa un numero di versione sei a posto: nessuna GPU necessaria fino a M07. I lab dichiarano la versione che trovano e si adattano — dove un'API dipende dalla versione, te lo dicono invece di fallire.</p>
+
+<p>Il controllo completo — <em>che cosa di questo corso puoi davvero eseguire tu</em>, quali sezioni si fermeranno, e come si legge un errore di versione — è il <strong><a href="m00b-ambiente.html">modulo successivo</a></strong>, che vale un'ora ed è la prima cosa da fare.</p>
+
+<div class="note errore">
+  <div class="mark">I numeri<br>che vedrai<br>non saranno<br>identici</div>
+  <div class="body">
+    <p>Le pagine riportano l'output dei lab così com'è. Ma <strong>alcuni numeri dipendono dall'ambiente</strong> e sui tuoi lab saranno diversi:</p>
+    <ul>
+      <li><strong>Rumore numerico vicino allo zero</strong> — «media dopo LayerNorm <code>-2.02e-09</code>» è zero con rumore. Sulla tua macchina sarà un altro valore altrettanto piccolo. Conta l'ordine di grandezza, non le cifre.</li>
+      <li><strong>Risultati di addestramenti</strong> — dipendono dalla versione di libreria e dal generatore casuale. Una perplessità di <code>2,21</code> potrebbe diventare <code>2,3</code>. Conta l'andamento e il confronto fra righe, non il valore assoluto.</li>
+      <li><strong>Tempi</strong> — dipendono dalla macchina, sempre.</li>
+    </ul>
+    <p>Restano invece <strong>identici</strong> i numeri che sono conseguenza di conti esatti: byte per parametro, conteggi di parametri, forme dei tensori, dimensioni di file. Se uno di quelli non torna, è un problema vero.</p>
+    <p>Nel corso c'è <code>verifica.py</code>, che esegue tutti i lab e segnala i numeri delle pagine che non compaiono in nessun output. Lanciarlo dopo aver cambiato qualcosa è il modo di accorgersi che una pagina è rimasta indietro.</p>
+  </div>
+</div>
+
+<h2>Convenzioni di scrittura</h2>
+
+<table>
+<tr><th>Scrittura</th><th>Significato</th></tr>
+<tr><td><code>[4096, 512]</code></td><td>La <em>forma</em> di un tensore: 4096 righe, 512 colonne. Sempre fra parentesi quadre, sempre in monospazio.</td></tr>
+<tr><td><code>bf16</code></td><td>Un tipo numerico: quanti byte occupa ogni singolo numero, e come sono spesi.</td></tr>
+<tr><td>27B</td><td>27 miliardi di <em>parametri</em>. La B sta per <em>billion</em>, mai per byte.</td></tr>
+<tr><td>GB / GiB</td><td>GB = 10<sup>9</sup> byte. GiB = 2<sup>30</sup> ≈ 1,074·10<sup>9</sup>. Scrivo sempre quale uso: la differenza è del 7%, che su 141 GB fa 10 GB — cioè esattamente la differenza fra entrarci e non entrarci.</td></tr>
+</table>
+
+<h2>Il caso di studio</h2>
+
+<p>L'ultimo modulo è la diagnosi del LoRA del caso di studio. Non è un esercizio: è il motivo per cui esiste il corso, e tutto quello che viene prima serve ad arrivarci attrezzato.</p>
+
+<p>Per farla servono <strong>gli artefatti del run</strong>: la configurazione dell'addestramento, il comando lanciato, il dataset, il modello base con la revisione esatta, il checkpoint valutato, e con quale misura è stato giudicato deludente.</p>
+
+<div class="note errore">
+  <div class="mark">Da verificare<br>adesso</div>
+  <div class="body">
+    <p>Se quei file non esistono più, non è una lacuna tecnica tua — ma è <strong>già un risultato diagnostico</strong>, e pesante: senza di essi molte ipotesi non si possono né confermare né escludere, e la conclusione onesta diventa «non determinabile, si rifà tracciando tutto».</p>
+    <p>Meglio scoprirlo oggi che fra nove mesi. Vai a vedere se ci sono, e segnati cosa manca.</p>
+  </div>
+</div>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

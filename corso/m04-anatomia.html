@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M04 — Anatomia dei pesi</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m04">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M04 · 5 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Anatomia dei pesi</h1>
+<p class="subtitle">Un modello sul disco è un file con dentro un elenco di tensori. Alla fine di questa pagina sai aprirlo, leggerlo e contarne i parametri senza caricarlo.</p>
+
+<p class="lede">Fin qui i tensori li hai costruiti tu. Adesso ne apriamo uno vero. La scoperta che conta è quanto sia poco misterioso: <strong>otto byte di lunghezza, un JSON, e poi i numeri, uno dietro l'altro</strong>. Nessuna compressione, nessun formato proprietario, niente da decodificare.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un modello dichiarato «7B» — sette miliardi di parametri — salvato in <code>bf16</code>, cioè 2 byte per numero.</p>
+    <ol>
+      <li>Quanti GB occupa il file su disco? (Conto a una cifra.)</li>
+      <li>Per elencare i nomi e le forme di tutti i suoi tensori, quanta RAM serve? Come il file? Molto meno? Quanto meno?</li>
+      <li>Il numero «7B» conta ogni singolo numero salvato sul disco, o può contare qualcosa di diverso?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>7·10⁹ × 2 byte = 14·10⁹ byte = <strong>14 GB</strong></code>.</p>
+    <p><strong>2.</strong> <strong>Qualche kilobyte.</strong> Non serve caricare nulla: nomi, forme e tipi stanno tutti nell'intestazione, che è un JSON di pochi KB all'inizio del file. Leggi i primi 8 byte per sapere quanto è lunga, leggi quella, hai finito. Nel lab qui sotto, un checkpoint da 30 MB ha un'intestazione di 4 136 byte — su un modello da 14 GB resta dello stesso ordine.</p>
+    <p><strong>3.</strong> <strong>Può contare qualcosa di diverso, e la differenza arriva a essere grossa.</strong> Se il modello ha gli <em>embedding legati</em>, la matrice del vocabolario è salvata una volta sola ma usata due volte — in ingresso e in uscita. Il numero dichiarato può includere entrambi gli usi, il disco no. Nel lab misuri uno scarto del <strong>27%</strong> su questa sola causa.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se ti è venuto naturale rispondere «serve tanta RAM quanto il file», hai appena disinnescato il riflesso più costoso: <strong>ispezionare non è caricare</strong>. Puoi rispondere a quasi tutte le domande su un modello da 500 GB dal tuo portatile.</p>
+  </div>
+</details>
+
+<h2>Il formato, per intero</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Un file <code>.safetensors</code> è fatto così, e non c'è altro:</p>
+    <pre style="margin:10px 0"><code>[  8 byte ]  lunghezza N dell'intestazione, uint64 little-endian
+[  N byte ]  intestazione JSON
+[  resto  ]  i numeri dei tensori, uno dietro l'altro</code></pre>
+    <p>L'intestazione mappa <strong>nome → <code>{dtype, shape, data_offsets}</code></strong>, dove <code>data_offsets</code> sono <code>[inizio, fine]</code> in byte dentro il blocco finale. Una voce reale:</p>
+    <pre style="margin:10px 0" data-lab="lab_04_1"><code>"model.embed_tokens.weight": {
+    "dtype": "BF16",
+    "shape": [8000, 512],
+    "data_offsets": [0, 8192000]
+}</code></pre>
+  </div>
+</div>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>solido</div>
+  <div class="body">
+    <p>È una tabella di allocazione: un indice all'inizio, un'area dati dietro, e ogni voce che dichiara dove comincia e dove finisce. Puoi mappare in memoria il file e leggere un singolo tensore senza toccare gli altri.</p>
+    <p><strong>Il motivo per cui esiste</strong> ti riguarderà direttamente. Il formato precedente erano file <em>pickle</em> di Python: per leggerli bisogna <em>eseguirli</em>, e un checkpoint scaricato può quindi eseguire codice arbitrario all'apertura. <code>safetensors</code> è dati e basta: nessun codice, nessuna esecuzione. È la differenza fra montare un'immagine disco e lanciare uno script che qualcuno ti ha mandato.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 04.1<br>anatomia</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_04_1_anatomia.py                  # checkpoint sintetico
+python3 corso/labs/lab_04_1_anatomia.py /path/al/modello  # un modello vero</code></pre>
+    <p>Senza argomenti costruisce da sé un checkpoint con le proporzioni di un denso stile Llama, così gira subito. Con un percorso, ispeziona qualunque directory che contenga file <code>.safetensors</code>, <strong>aggregando tutti gli shard</strong> — provalo sul modello base del LoRA del caso di studio.</p>
+    <p>La lettura dell'intestazione è scritta senza librerie: <code>struct.unpack</code> e <code>json.loads</code>, otto righe. Vale la pena aprirlo.</p>
+  </div>
+</div>
+
+<h2>Lo sharding, e il conto sbagliato che ne nasce</h2>
+
+<p>Un modello grande non sta in un file solo: viene spezzato in <em>shard</em>, con un indice che dice quale tensore vive in quale file.</p>
+
+<pre data-lab="nessuno"><code>model-00001-of-00003.safetensors        13 tensori
+model-00002-of-00003.safetensors        13 tensori
+model-00003-of-00003.safetensors        13 tensori
+model.safetensors.index.json            mappa 39 tensori sugli shard</code></pre>
+
+<div class="note errore">
+  <div class="mark">Errore che<br>ho fatto io</div>
+  <div class="body">
+    <p>La prima versione di questo lab trovava tutti gli shard e poi <strong>ne leggeva solo il primo</strong>, presentando i suoi totali come se fossero quelli del modello. Su un checkpoint in tre pezzi avrebbe dichiarato circa un terzo dei parametri, quote MLP/attention distorte, e avrebbe potuto non trovare <code>lm_head</code> — concludendo «embedding legati» su un modello che non li ha.</p>
+    <p>Il guasto peggiore possibile: <strong>nessun errore, solo numeri plausibili e falsi.</strong> E si sarebbe manifestato proprio sui modelli veri, perché quelli piccoli stanno in un file solo e sembrano funzionare.</p>
+    <p>Ora il lab aggrega tutti gli shard e ti avverte quando ne trova più di uno. Ma la lezione vale oltre il lab: <strong>quando ispezioni un checkpoint, controlla sempre quanti file stai leggendo davvero.</strong></p>
+  </div>
+</div>
+
+<p>Due dettagli che contano quando leggi l'intestazione a mano:</p>
+
+<ul>
+  <li>Gli <code>data_offsets</code> sono relativi al <strong>proprio shard</strong>, non al modello intero. Non sommarli fra file diversi.</li>
+  <li>Ogni shard ha il suo prefisso da 8 byte e la sua intestazione. Nel conto totale vanno moltiplicati per il numero di file — nel lab lo vedi: <code>24</code> byte di prefissi per tre shard.</li>
+</ul>
+
+<h2>I nomi</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Convenzione diffusa per un modello denso stile Llama. Ogni strato ripete lo stesso blocco:</p>
+    <pre style="margin:10px 0"><code>model.embed_tokens.weight                   tabella degli embedding
+
+model.layers.N.self_attn.q_proj.weight      query
+model.layers.N.self_attn.k_proj.weight      key
+model.layers.N.self_attn.v_proj.weight      value
+model.layers.N.self_attn.o_proj.weight      proiezione di uscita
+
+model.layers.N.mlp.gate_proj.weight     ┐
+model.layers.N.mlp.up_proj.weight       ├─  tre matrici, non due
+model.layers.N.mlp.down_proj.weight     ┘
+
+model.layers.N.input_layernorm.weight           vettori, non matrici
+model.layers.N.post_attention_layernorm.weight
+
+model.norm.weight                           normalizzazione finale
+lm_head.weight                              proiezione a vocabolario</code></pre>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Il naming non<br>è universale</div>
+  <div class="body">
+    <p>Questa convenzione è <em>diffusa</em>, non <em>standard</em>. Altri repository fondono Q, K e V in un unico tensore; i checkpoint shardati per tensor parallel spezzano ogni matrice in pezzi; alcune conversioni rinominano tutto.</p>
+    <p><strong>Il nome è un'ipotesi da verificare, non un fatto.</strong> Il metodo che regge sempre è triangolare tre cose: il nome, i valori dichiarati nella <code>config.json</code>, e la forma del tensore. Se le tre concordano, hai capito cos'è. Se no, hai imparato qualcosa sul checkpoint.</p>
+    <p>Il lab lo mette in pratica: se non riconosce <code>q_proj</code>/<code>k_proj</code>, non fallisce — te lo dice, perché è informazione, non errore.</p>
+  </div>
+</div>
+
+<h2>Il conto torna, byte per byte</h2>
+
+<p>Il lab somma i parametri dichiarati nell'intestazione e confronta con la dimensione reale del file:</p>
+
+<pre data-lab="lab_04_1"><code>parametri totali                   15,176,192
+byte dei tensori (somma)           30,352,384
++ header JSON                           4,136
++ prefisso di lunghezza                     8   (l'uint64 iniziale)
+==============================================
+atteso                             30,356,528
+dimensione reale del file          30,356,528
+residuo non spiegato                        0</code></pre>
+
+<p><strong>Zero.</strong> Il file è esattamente prefisso più intestazione più tensori. Nessuna compressione, nessun padding, nessun metadato nascosto. Questo è il primo controllo da fare su qualunque checkpoint: se il conto non torna, c'è qualcosa che non hai capito del file — ed è meglio scoprirlo prima di addestrarci sopra.</p>
+
+<h3>Dove finiscono i parametri</h3>
+
+<pre data-lab="lab_04_1"><code>gruppo              tensori      parametri   quota
+MLP                      12      8,454,144   55.7%
+embedding                 1      4,096,000   27.0%
+attention                16      2,621,440   17.3%
+normalizzazioni           9          4,608    0.0%</code></pre>
+
+<p>Due cose da portare via, che tornano in M06 e M14.</p>
+
+<p><strong>L'MLP domina.</strong> Qui è il 55,7% con dodici tensori; l'attention è il 17,3% con sedici. Sono le tre matrici <code>gate</code>, <code>up</code>, <code>down</code>, ciascuna più grande di una singola matrice di attention. Quando in M14 sceglierai i <code>target_modules</code> di un LoRA, questa tabella è il motivo per cui la scelta «solo attention» e la scelta «anche MLP» non sono equivalenti: toccano frazioni molto diverse del modello.</p>
+
+<p><strong>Le normalizzazioni sono lo 0,0%.</strong> Nove tensori, 4 608 parametri: sono vettori, non matrici. Contano nulla in memoria e sono fra le cose che tengono in piedi l'addestramento — sono la difesa contro le esponenziali della regola della catena di M02.</p>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Guarda le forme nel lab: <code>q_proj.weight</code> è <code>[512, 512]</code>, <code>k_proj.weight</code> è <code>[128, 512]</code>.</p>
+    <ol>
+      <li>È un errore del checkpoint?</li>
+      <li>Se no: cosa significa che l'uscita di K è quattro volte più piccola di quella di Q?</li>
+      <li>Che cosa si risparmia, e cosa <em>non</em> si risparmia?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> No, è voluto.</p>
+    <p><strong>2.</strong> È <strong>Grouped-Query Attention</strong>: più teste di query condividono le stesse teste di key e value. Qui il rapporto è 4, cioè quattro teste di query per ogni gruppo di key/value. Il caso limite con un solo gruppo si chiama Multi-Query Attention; il caso senza condivisione, con Q e K della stessa forma, è l'attention classica a teste multiple.</p>
+    <p><strong>3.</strong> Si risparmiano i parametri di K e V e il calcolo su di essi — e soprattutto la <em>KV cache</em> in inferenza, che è la ragione principale per cui la tecnica esiste. <strong>Non</strong> si risparmia nulla su Q, che resta a dimensione piena.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Verifica di coerenza che puoi fare su qualunque modello: <code>config.json</code> dichiara <code>num_attention_heads</code> e <code>num_key_value_heads</code>. Il loro rapporto deve coincidere con quello delle forme. Se non coincide, o hai letto male le forme o il checkpoint non è quello che credi.</p>
+  </div>
+</details>
+
+<h2>Tied embeddings</h2>
+
+<p>Nel checkpoint del lab <code>lm_head.weight</code> <strong>non esiste</strong>. Il modello deve comunque produrre un punteggio per ogni voce del vocabolario, quindi riusa la matrice degli embedding — la stessa che trasforma i token in vettori in ingresso, usata al contrario in uscita.</p>
+
+<pre data-lab="lab_04_1"><code>lm_head presente nel checkpoint?   NO
+embed_tokens                       forma [8000, 512], 4,096,000 parametri
+
+parametri LOGICI (unici)             15,176,192
+parametri se contassi la testa       19,272,192
+differenza                            4,096,000  (27.0%)
+
+config.json dichiara: tie_word_embeddings = True</code></pre>
+
+<div class="note errore">
+  <div class="mark">Perché ti<br>riguarda</div>
+  <div class="body">
+    <p>Due conteggi entrambi difendibili, che differiscono del <strong>27%</strong>. «Quanti parametri ha questo modello» non ha una sola risposta finché non dichiari se stai contando i valori <em>unici</em> sul disco o gli <em>usi</em> nel grafo di calcolo.</p>
+    <p>La conseguenza pratica arriva quando i conti non tornano: se stimi la memoria e ti manca — o ti avanza — una frazione sospetta, controlla <code>tie_word_embeddings</code> nella configurazione <em>prima</em> di cercare altrove. Su un vocabolario grande questa singola voce vale svariati GB.</p>
+    <p>Ha anche un effetto sull'addestramento, che vedrai in M14: aggiornare l'embedding aggiorna simultaneamente la testa di uscita, perché sono lo stesso tensore. Non è sempre quello che vuoi.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Quanti byte devi leggere di un file da 200 GB per elencare nomi e forme di tutti i suoi tensori?</li>
+  <li>Un tensore <code>model.layers.7.mlp.down_proj.weight</code> ha forma <code>[4096, 11008]</code>. Quanti numeri prende in ingresso e quanti ne produce?</li>
+  <li>La somma dei byte dei tensori è 27 GB, il file ne occupa 27,00004. Dove sono finiti gli altri?</li>
+  <li>Un modello dichiara 8B parametri ma i suoi file <code>bf16</code> occupano 15 GB invece di 16. Prima ipotesi da controllare?</li>
+  <li><code>q_proj</code> è <code>[4096, 4096]</code> e <code>k_proj</code> è <code>[512, 4096]</code>. Quante teste di query per gruppo? Cosa si risparmia?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Otto byte, più la lunghezza dell'intestazione che quegli otto byte dichiarano: qualche KB in tutto. La dimensione del file non c'entra.</p>
+    <p><strong>2.</strong> Convenzione <code>[out, in]</code>: prende <strong>11 008</strong> numeri e ne produce <strong>4 096</strong>. È la matrice che riporta l'MLP alla dimensione del modello — infatti si chiama <em>down</em>.</p>
+    <p><strong>3.</strong> Nell'intestazione JSON più gli otto byte del prefisso di lunghezza. Se il residuo fosse molto più grande, allora ci sarebbe padding o metadati, e varrebbe la pena guardare cosa.</p>
+    <p><strong>4.</strong> <strong>Embedding legati.</strong> Il conteggio dichiarato include probabilmente la testa di uscita, che sul disco non c'è. Controlla <code>tie_word_embeddings</code> nella configurazione. Se è <code>false</code>, allora l'ipotesi cade e si guarda altrove: parte dei tensori in un dtype diverso, oppure file mancanti.</p>
+    <p><strong>5.</strong> <code>4096 / 512 = <strong>8</strong></code> teste di query per gruppo. Si risparmiano i parametri e il calcolo di K e V, e soprattutto la KV cache in inferenza. Su Q non si risparmia niente.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

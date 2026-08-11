@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M02 — Derivate e gradienti</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m02">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M02 · 4 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Derivate e gradienti</h1>
+<p class="subtitle">Tutta la matematica che serve per capire un addestramento sta in questa pagina. Non è poca, ma è finita — e si vede con un <code>print()</code>.</p>
+
+<p class="lede">Una derivata risponde a una domanda sola, sempre la stessa: <strong>«se muovo questo di pochissimo, quanto si muove quello?»</strong> Se tieni ferma questa frase, tutto il resto della pagina è notazione.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Non serve ricordare nulla dalla scuola. Ragiona con i numeri.</p>
+    <p>Ho la funzione <code>y = x²</code>. Adesso <code>x = 3</code>, quindi <code>y = 9</code>.</p>
+    <ol>
+      <li>Se porto <code>x</code> a <code>3,001</code>, quanto vale <code>y</code>? (Fai il conto: 3,001 × 3,001.)</li>
+      <li>Di quanto è cambiato <code>y</code>?</li>
+      <li>Dividi quel cambiamento per <code>0,001</code>. Che numero esce?</li>
+      <li>Ripeti mentalmente partendo da <code>x = 10</code>. Il numero del punto 3 sarebbe più grande o più piccolo?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> 3,001 × 3,001 = <strong>9,006001</strong></p>
+    <p><strong>2.</strong> 9,006001 − 9 = <strong>0,006001</strong></p>
+    <p><strong>3.</strong> 0,006001 / 0,001 = <strong>6,001</strong> ≈ <strong>6</strong></p>
+    <p><strong>4.</strong> Più grande: verrebbe ≈ 20.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Hai appena calcolato una derivata.</strong> Nessuna formula, solo una divisione.</p>
+    <p>Il 6 significa: <em>in questo punto, y cambia sei volte più in fretta di x</em>. E il fatto che a x=10 venga 20 dice che <strong>la derivata dipende da dove ti trovi</strong> — non è una proprietà della funzione, è una proprietà del punto.</p>
+    <p>La regola generale, se la vuoi: per <code>y = x²</code> la derivata è <code>2x</code>. A x=3 → 6. A x=10 → 20. Ma la regola serve meno di quanto pensi: quello che conta è il significato.</p>
+  </div>
+</details>
+
+<h2>La derivata è una sensibilità</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>La <strong>derivata</strong> di <code>y</code> rispetto a <code>x</code>, scritta <code>dy/dx</code>, è: <em>di quanto cambia y per ogni unità di cambiamento di x, in questo preciso punto</em>.</p>
+    <p>Il segno conta quanto il valore:</p>
+    <ul>
+      <li><code>dy/dx = +6</code> → aumento x, y sale. Per far <strong>scendere</strong> y devo <strong>diminuire</strong> x.</li>
+      <li><code>dy/dx = −6</code> → aumento x, y scende. Per far scendere y devo <strong>aumentare</strong> x.</li>
+      <li><code>dy/dx = 0</code> → muovere x non cambia niente. Sei su un punto piatto.</li>
+    </ul>
+    <p>Notazione: <code>d</code> significa «un cambiamento infinitesimo di». <code>dy/dx</code> si legge «de y su de x».</p>
+  </div>
+</div>
+
+<p><strong>Perché a te importa.</strong> In un addestramento, <code>y</code> è l'errore del modello e <code>x</code> è uno dei 27 miliardi di pesi. La derivata dell'errore rispetto a quel peso ti dice: <em>se aumento questo peso di pochissimo, l'errore sale o scende, e di quanto?</em></p>
+
+<p>Segno negativo → aumenta il peso. Segno positivo → diminuiscilo. Ripeti per tutti i 27 miliardi, ripeti qualche migliaio di volte. <strong>Questo è l'addestramento, per intero.</strong> Il resto sono dettagli su come farlo in fretta e senza esplodere.</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>onesto</div>
+  <div class="body">
+    <p>C'è un ponte parziale con l'autoscaling: misuri una metrica, calcoli di quanto sei fuori bersaglio, correggi in proporzione, ripeti. Un controllore proporzionale.</p>
+    <p><strong>Dove si rompe, e conta:</strong> nell'autoscaling manovri una leva (le repliche) e osservi una metrica. Qui le leve sono 27 miliardi <em>simultaneamente</em>, e per ognuna serve la sua sensibilità specifica. Calcolarle una alla volta perturbando i pesi sarebbe impossibile: servirebbero 27 miliardi di esecuzioni del modello per un solo passo.</p>
+    <p>L'algoritmo che le calcola <strong>tutte in una sola passata</strong> è la <em>backpropagation</em>, ed è il motivo per cui tutto questo esiste. Arriva fra due sezioni.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 02.1<br>derivata a mano</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_02_1_derivata.py</code></pre>
+    <p>Calcola derivate col metodo che hai appena usato — sposta di poco, guarda di quanto cambia — e le confronta con quelle esatte.</p>
+  </div>
+</div>
+
+<h2>La regola della catena</h2>
+
+<p>Le funzioni si compongono: l'uscita di una è l'ingresso della successiva. Un modello con 60 strati è una composizione di 60 funzioni. La regola che permette di attraversarle è una sola, e si <strong>moltiplica</strong>.</p>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Se <code>u</code> dipende da <code>x</code>, e <code>y</code> dipende da <code>u</code>, allora:</p>
+    <pre style="margin:10px 0"><code>dy/dx  =  dy/du  ×  du/dx</code></pre>
+    <p>Le sensibilità si moltiplicano lungo la catena.</p>
+  </div>
+</div>
+
+<p>In numeri: se raddoppiando <code>x</code> raddoppia <code>u</code> (<code>du/dx = 2</code>), e triplicando <code>u</code> triplica <code>y</code> (<code>dy/du = 3</code>), allora muovendo <code>x</code> di 1 muovi <code>y</code> di 6. È tutto qui.</p>
+
+<div class="note errore">
+  <div class="mark">Errore comune</div>
+  <div class="body">
+    <p><strong>Da qui nascono i gradienti che esplodono e quelli che svaniscono</strong>, e in M08 li vedrai nei log.</p>
+    <p>Sessanta strati significano sessanta fattori moltiplicati. Se ognuno vale in media 1,1, il prodotto è 1,1<sup>60</sup> ≈ <strong>304</strong>. Se ognuno vale 0,9, è 0,9<sup>60</sup> ≈ <strong>0,0018</strong>.</p>
+    <p>Nel primo caso i primi strati ricevono correzioni enormi e i pesi schizzano via — la loss diventa <code>NaN</code>. Nel secondo non ricevono quasi niente e non imparano mai.</p>
+    <p>La normalizzazione e i collegamenti residui agiscono <strong>sulla propagazione</strong>: cambiano le Jacobiane locali, cioè i fattori che vengono moltiplicati, e tengono il prodotto più vicino a 1. Non sono trucchi: sono difese contro un'esponenziale.</p>
+    <p>Il <em>gradient clipping</em> fa una cosa diversa e va tenuto separato: agisce <strong>dopo</strong> il backward, sul gradiente già calcolato, limitandone la norma globale. Non modifica nessuna Jacobiana e non recupera un gradiente svanito — mette solo un tetto agli aggiornamenti esplosivi.</p>
+  </div>
+</div>
+
+<h2>Da derivata a gradiente</h2>
+
+<p>Con più variabili, si deriva rispetto a una per volta tenendo ferme le altre. Ognuna è una <strong>derivata parziale</strong>, scritta con la <code>∂</code> tonda invece della <code>d</code>. Il <strong>gradiente</strong> è semplicemente tutte quelle derivate parziali messe insieme.</p>
+
+<pre data-lab="nessuno"><code>L = f(w₁, w₂, w₃)
+
+∂L/∂w₁ = 0.5     "alzando w₁, L sale"
+∂L/∂w₂ = -2.0    "alzando w₂, L scende, e in fretta"
+∂L/∂w₃ = 0.0     "w₃ qui non conta niente"
+
+gradiente = [0.5, -2.0, 0.0]</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Nozione<br>cruciale</div>
+  <div class="body">
+    <p><strong>Il gradiente ha sempre la stessa forma dell'oggetto rispetto a cui deriva.</strong></p>
+    <p>Un peso <code>[11008, 4096]</code> ha un gradiente <code>[11008, 4096]</code>. Un peso da 27 miliardi di numeri ha un gradiente da 27 miliardi di numeri.</p>
+    <p>Da qui viene, direttamente, il primo raddoppio della memoria in addestramento — e in M06 sarà una riga del conto.</p>
+  </div>
+</div>
+
+<h3>Il gradiente di un prodotto fra matrici</h3>
+
+<p>È l'unica formula matriciale che ti serve davvero sapere, perché è quella che governa la memoria.</p>
+
+<pre><code>Y = X @ W          X:[N, in]   W:[in, out]   Y:[N, out]
+
+∂L/∂W  =  X.T @ (∂L/∂Y)        [in,N] @ [N,out]  →  [in,out]  ✓
+∂L/∂X  =  (∂L/∂Y) @ W.T        [N,out] @ [out,in] →  [N,in]   ✓</code></pre>
+
+<p>Non serve memorizzarla: le forme la ricostruiscono da sole. <code>∂L/∂W</code> deve avere la forma di <code>W</code>, e c'è un solo modo di combinare i pezzi disponibili per ottenerla.</p>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Guarda la formula di <code>∂L/∂W</code> e rispondi:</p>
+    <ol>
+      <li>Per calcolare il gradiente rispetto a <code>W</code>, quale valore <strong>deve essere ancora disponibile</strong> dopo che il calcolo in avanti è finito?</li>
+      <li>Quel valore ha forma <code>[N, in]</code>, dove N è batch × lunghezza sequenza. Se raddoppio il batch, quella memoria cosa fa?</li>
+      <li>Quindi, in un modello con 60 strati, quanti di questi valori restano in memoria contemporaneamente?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong><code>X</code>, l'ingresso dello strato.</strong> Senza X non puoi calcolare <code>∂L/∂W</code>: la formula lo richiede esplicitamente.</p>
+    <p><strong>2.</strong> <strong>Raddoppia.</strong> Cresce linearmente con batch × lunghezza della sequenza.</p>
+    <p><strong>3.</strong> <strong>Sessanta</strong> — uno per strato, tutti insieme.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Hai appena scoperto da solo cosa sono le <strong>attivazioni</strong>, e perché occupano tanta memoria: sono gli ingressi di ogni strato, tenuti da parte perché il calcolo all'indietro li richiede.</p>
+    <p>E hai scoperto perché esiste il <em>gradient checkpointing</em>: invece di conservarli tutti, ne conservi alcuni e <strong>ricalcoli</strong> gli altri quando servono. Meno memoria, più tempo di calcolo. È M07, ma il meccanismo lo hai già in mano.</p>
+    <p><strong>Precisazione terminologica</strong>, perché la userò con precisione: si dice che X viene «trattenuto», non «copiato». Il sistema conserva un <em>riferimento</em> al blocco di memoria già esistente. Nessuna copia — semplicemente quella memoria non può essere liberata finché il calcolo all'indietro non è passato.</p>
+  </div>
+</details>
+
+<h2>Autograd: chi fa i conti al posto tuo</h2>
+
+<p>PyTorch costruisce, mentre calcola in avanti, il grafo delle operazioni eseguite. Poi lo ripercorre all'indietro applicando la regola della catena. Tu non derivi mai nulla a mano.</p>
+
+<pre data-lab="nessuno"><code>import torch
+
+x = torch.tensor(3.0, requires_grad=True)   # "tienimi traccia di questo"
+y = x ** 2                                   # y = 9
+y.backward()                                 # percorri all'indietro
+print(x.grad)                                # tensor(6.)  ← il 6 di prima</code></pre>
+
+<p>Tre elementi, e sono sempre questi tre:</p>
+
+<table>
+<tr><th>Elemento</th><th>Cosa fa</th></tr>
+<tr><td><code>requires_grad=True</code></td><td>Dice «traccia le operazioni che passano da qui, mi servirà il gradiente». <strong>Non</strong> significa «cosa da imparare»: sono due cose distinte. Un ingresso può richiedere il gradiente senza essere mai aggiornato — succede negli attacchi avversariali e nel calcolo all'indietro fra strati. Cosa viene <em>imparato</em> lo decide l'optimizer, non questo flag.</td></tr>
+<tr><td><code>.backward()</code></td><td>Si chiama <strong>su uno scalare</strong> — di solito la loss — e propaga i gradienti all'indietro lungo tutto il grafo.</td></tr>
+<tr><td><code>.grad</code></td><td>Dove finisce il risultato. Stessa forma del tensore. Prima di <code>backward()</code> è <code>None</code>.</td></tr>
+</table>
+
+<div class="note errore">
+  <div class="mark">Precisione,<br>non pedanteria</div>
+  <div class="body">
+    <p><strong><code>.backward()</code> riempie <code>.grad</code> solo dei tensori <em>foglia</em></strong> (in inglese <em>leaf</em>): quelli che hai creato tu, non quelli prodotti da un'operazione.</p>
+    <pre style="margin:10px 0" data-lab="nessuno"><code>x = torch.tensor(3.0, requires_grad=True)   # foglia
+u = x * 2                                    # NON foglia: risultato di un'operazione
+y = u ** 2
+y.backward()
+
+print(x.grad)      # tensor(24.)  ← c'è
+print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
+                   #                   calcolato e usato per arrivare a x</code></pre>
+    <p>Il gradiente di <code>u</code> <em>esiste</em> durante la propagazione — serve per raggiungere <code>x</code> — ma viene scartato subito dopo, perché conservare i valori intermedi di miliardi di attivazioni sarebbe insostenibile. Per trattenerlo devi chiederlo: <code>u.retain_grad()</code> prima di <code>backward()</code>.</p>
+    <p><strong>Perché ti servirà:</strong> quando in M21 vorrai ispezionare il gradiente in un punto intermedio della rete per capire dove si spegne o dove esplode, scoprirai <code>None</code> e penserai a un bug. Non lo è: è il comportamento previsto.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Errore comune</div>
+  <div class="body">
+    <p><strong><code>.grad</code> si accumula: non si sovrascrive.</strong></p>
+    <pre><code>x = torch.tensor(3.0, requires_grad=True)
+(x**2).backward();  print(x.grad)   # 6
+(x**2).backward();  print(x.grad)   # 12  ← sommato, non 6
+(x**2).backward();  print(x.grad)   # 18</code></pre>
+    <p>È una scelta deliberata: serve per sommare i gradienti di più mini-batch prima di aggiornare i pesi (<em>gradient accumulation</em>, il modo standard di simulare un batch grande senza averne la memoria — M08).</p>
+    <p>Ma se dimentichi <code>optimizer.zero_grad()</code> nel ciclo, ogni passo somma tutta la storia precedente e gli aggiornamenti diventano troppo grandi.</p>
+    <p><strong>Il sintomo però potrebbe non essere quello che ti aspetteresti.</strong> Nell'esperimento di M03 la loss <em>non</em> sale in modo monotono e <em>non</em> esplode a <code>NaN</code>: <strong>oscilla</strong> dentro un intervallo, e ogni tanto tocca valori molto bassi. Se guardi il log nel momento sbagliato sembra che stia andando benissimo.</p>
+    <p>Quello che l'accumulo produce <em>sempre</em> è un aggiornamento più grande del dovuto, che cresce con la storia. Come si manifesti dipende poi da modello, learning rate e dati: può oscillare, può divergere a <code>NaN</code>, può saturare. <strong>Nessuno di questi è una firma univoca</strong> — e in particolare cercare «la loss sale» ti farebbe mancare il caso mostrato in M03.</p>
+    <p>La verifica che non dipende dal sintomo è diretta: <strong>guarda il codice</strong>, o stampa la norma del gradiente prima e dopo l'azzeramento. Costa meno che indovinare dai log.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 02.2<br>autograd</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_02_2_autograd.py</code></pre>
+    <p>Verifica numericamente le formule matriciali, mostra l'accumulo del gradiente, e conferma che gradiente e peso hanno la stessa forma.</p>
+  </div>
+</div>
+
+<h2>Softmax e cross-entropy</h2>
+
+<p>Un modello linguistico non produce parole: produce un numero per ogni voce del vocabolario. Con un vocabolario da 128 000 voci, l'uscita per un token è un vettore <code>[128000]</code> di numeri qualsiasi — positivi, negativi, di qualunque grandezza. Si chiamano <strong>logit</strong>.</p>
+
+<p>Servono due passaggi per trasformarli in un errore.</p>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p><strong>Softmax</strong> trasforma numeri qualsiasi in probabilità: tutte positive, somma 1.</p>
+    <pre style="margin:10px 0"><code>p_i = e^(z_i) / Σ_j e^(z_j)</code></pre>
+    <p>L'esponenziale rende tutto positivo e amplifica le differenze; la divisione per la somma normalizza a 1.</p>
+    <p><strong>Cross-entropy</strong> misura quanto era sbagliata la probabilità assegnata alla risposta giusta:</p>
+    <pre style="margin:10px 0"><code>L = −log(p_k)        k = indice del token corretto</code></pre>
+    <p>Se il modello dava <code>p_k = 1</code> (certezza corretta), <code>−log(1) = 0</code>: nessun errore. Se dava <code>p_k = 0,01</code>, <code>−log(0,01) ≈ 4,6</code>. Se dava quasi zero, l'errore tende a infinito.</p>
+  </div>
+</div>
+
+<p><strong>Questa è la loss che vedi scorrere in ogni log di addestramento.</strong> Quando leggi <code>loss: 2.31</code>, sono questi <code>−log(p)</code> mediati su tutti i token del batch.</p>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un modello <strong>appena inizializzato</strong>, che non ha imparato nulla, su un vocabolario da 128 000 voci. Non ha alcuna preferenza: assegna la stessa probabilità a ogni voce.</p>
+    <ol>
+      <li>Che probabilità dà al token corretto?</li>
+      <li>Quanto vale la loss? (Serve <code>ln(128000) ≈ 11,76</code>.)</li>
+      <li>Se al primo passo del tuo addestramento la loss vale <strong>0,02</strong>, cosa concludi?</li>
+      <li>E se vale <strong>34</strong>?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>1/128000 ≈ 0,0000078</code></p>
+    <p><strong>2.</strong> <code>−log(1/128000) = log(128000) ≈ 11,76</code></p>
+    <p><strong>3.</strong> <strong>Qualcosa è rotto, non è un successo</strong> — <em>a patto che il modello sia davvero appena inizializzato</em>. Una loss quasi nulla significa che sta già indovinando, quasi sempre perché vede la risposta in ingresso: maschera della loss sbagliata, o dati duplicati.</p>
+    <p><strong>4.</strong> <strong>Molto peggio del caso, quindi anche questo è rotto.</strong> Il caso puro dà 11,76; per fare peggio bisogna essere sistematicamente sbagliati. Tipico di: token disallineati di una posizione, template errato, tokenizer diverso da quello del modello.</p>
+
+    <div class="note errore" style="margin-top:18px">
+      <div class="mark">Limite di<br>validità</div>
+      <div class="body">
+        <p><strong><code>log(V)</code> vale solo per un modello inizializzato a caso.</strong> Non è un controllo universale, ed è importante che tu non lo applichi dove non vale — cioè esattamente al tuo caso.</p>
+        <p>Quando fai fine-tuning o LoRA su un modello <em>preaddestrato</em>, quel modello prevede già bene: la loss al primo passo non parte da 11,76, parte da dove lo porta la sua competenza sui tuoi dati. Un valore fra 1 e 3 è del tutto normale, e <strong>non prova nessuna contaminazione</strong>.</p>
+        <p>Anche a inizializzazione casuale, <code>log(V)</code> è un valore <em>atteso</em>, non esatto: i logit iniziali non sono perfettamente uniformi, e dettagli come i pesi legati fra embedding e testa di uscita, o le posizioni escluse dalla loss, lo spostano di qualcosa.</p>
+      </div>
+    </div>
+
+    <p><strong>I controlli giusti per un fine-tuning sono due, e sono di natura diversa.</strong> Tenerli separati è metà del lavoro: il primo è una verifica esatta, il secondo una misura rumorosa. Confonderli è il modo più comune di trarre conclusioni false.</p>
+
+    <div class="note nozione" style="margin-top:16px">
+      <div class="mark">Controllo A<br>parità</div>
+      <div class="body">
+        <p><strong>Domanda:</strong> il mio codice di addestramento sta calcolando quello che credo?</p>
+        <p>Misura la loss del modello <strong>base</strong> e quella al <strong>passo zero</strong> dell'addestramento — zero aggiornamenti — mantenendo tutto identico: stesso batch, stessa maschera, stessa modalità, stesso stato dei generatori casuali, adattatore appena inizializzato.</p>
+        <p><strong>Esito atteso: coincidono.</strong> Un LoRA inizializzato nel modo standard non contribuisce nulla all'uscita, quindi il modello con adattatore <em>è</em> il modello base. Differenze all'ordine di <code>1e-6</code> sono rumore numerico — un percorso di calcolo leggermente diverso. Differenze di qualche decimo, no.</p>
+        <p><strong>È un controllo binario: passa o non passa.</strong> Non è graduabile e non dice niente sulla qualità dei dati.</p>
+      </div>
+    </div>
+
+    <p>Il controllo <strong>fallisce</strong> quando lo scarto supera la tolleranza numerica — <strong>in qualunque direzione</strong>. Più alta o più bassa è irrilevante: conta il valore assoluto. La conclusione è una sola e non ammette sfumature: <em>una delle condizioni che credevi identiche non lo è</em>. Il percorso di addestramento e quello di valutazione stanno facendo cose diverse.</p>
+
+    <div class="note errore" style="margin-top:16px">
+      <div class="mark">Come <em>non</em><br>si diagnostica</div>
+      <div class="body">
+        <p>Verrebbe naturale costruire una tabella «sintomo → causa» e leggere lo scarto per capire cosa è rotto. <strong>Non funziona, e ti farebbe concludere il falso.</strong></p>
+        <p>Le cause producono scarti che si somigliano troppo. Due esempi che sembrano distinguibili e non lo sono:</p>
+        <ul>
+          <li>Uno scarto <em>variabile fra esecuzioni</em> sembra la firma dei generatori casuali. Ma se i due percorsi hanno semi fissati e semplicemente <em>diversi</em>, lo scarto è perfettamente stabile e riproducibile — identico a quello di un template sbagliato.</li>
+          <li>Il <em>segno</em> smette di informare quando il guasto è piccolo. Nel lab lo misuri: con una perturbazione forte l'adattatore casuale ha peggiorato la loss in tutti i 40 tentativi dello sweep, ma riducendola di cento volte il segno diventa testa o croce — 22 volte su 40 la loss <em>scende</em>. Sono numeri di quel singolo sweep su un batch fisso, non una legge: bastano a mostrare che il segno non è un criterio, non a stabilire una soglia. E in una diagnosi reale sei spesso nella zona bassa, perché se lo scarto fosse enorme te ne saresti già accorto.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p>Le cause si separano con <strong>interventi</strong>, non con l'osservazione: ne elimini una alla volta e guardi se lo scarto sparisce. In ordine di costo — prima quello che costa un flag, poi quello che richiede di ispezionare i dati:</p>
+
+    <table style="margin-top:10px">
+      <tr><th>Ipotesi</th><th>Intervento che la elimina</th></tr>
+      <tr><td>Modalità o generatori casuali diversi</td><td>Forza <code>eval()</code> e lo stesso seme in entrambi i percorsi, poi rimisura.</td></tr>
+      <tr><td>Adattatore non neutro all'inizializzazione</td><td>Azzera esplicitamente la matrice che deve essere nulla, e rimisura.</td></tr>
+      <tr><td>Divergenza nella preparazione dei dati</td><td>Confronta l'<strong>input strutturato</strong> che i due percorsi passano al template: la lista dei messaggi, i campi presi dal record, il prompt di sistema. Se differisce già qui, il template non c'entra.</td></tr>
+      <tr><td>Template applicato diversamente</td><td>Solo <em>a parità di input strutturato</em>: applica il template in entrambi i percorsi e confronta il testo prodotto. Input uguale + testo diverso = è il template (stringa diversa, o opzioni diverse).</td></tr>
+      <tr><td>Tokenizer diverso, o token speciali aggiunti da un lato solo</td><td>Solo <em>a parità di testo</em>: tokenizza <strong>quel testo</strong> con entrambi i tokenizer e confronta gli <code>input_ids</code>. Testo uguale + id diversi = tokenizer.</td></tr>
+      <tr><td>Maschera della loss diversa</td><td>Confronta il tensore delle etichette <strong>elemento per elemento</strong>: quali posizioni valgono <code>ignore_index</code> e quali no, e con che allineamento.</td></tr>
+    </table>
+
+    <div class="note errore" style="margin-top:16px">
+      <div class="mark">Tre trappole<br>in questi test</div>
+      <div class="body">
+        <p><strong>Testo diverso non significa «è il template».</strong> Significa soltanto che la divergenza è <em>a monte della tokenizzazione</em> — e lì ci sta dentro tutto: come hai letto il record, quali campi hai mappato, se hai inserito un prompt di sistema, come hai normalizzato gli spazi. Per accusare il template devi prima dimostrare che l'input strutturato era identico. Altrimenti la conclusione onesta si ferma a «problema a monte del tokenizer», che è comunque un'informazione utile: hai dimezzato lo spazio di ricerca.</p>
+        <p><strong>Gli <code>input_ids</code> da soli non separano template da tokenizer.</strong> Entrambi li cambiano. L'ordine delle righe non è estetico: ogni test presuppone che il precedente sia passato.</p>
+        <p><strong>Contare le posizioni mascherate non basta.</strong> Due maschere possono avere lo <em>stesso numero</em> di posizioni attive e coprirne di <em>diverse</em>. Il caso peggiore è lo sfasamento di una posizione: stesso conteggio, allineamento sbagliato, e il modello impara a prevedere il token sbagliato. Serve il confronto elemento per elemento, non un totale.</p>
+      </div>
+    </div>
+
+    <div class="note ponte">
+      <div class="mark">Un intreccio<br>da sapere</div>
+      <div class="body">
+        <p>Nelle librerie più diffuse il chat template è <strong>conservato dentro la configurazione del tokenizer</strong>. Due tokenizer diversi portano quindi, spesso, anche due template diversi: le due ipotesi non sono indipendenti come la tabella lascerebbe credere.</p>
+        <p>Per questo il test del template va fatto applicando <em>esplicitamente</em> lo stesso template in entrambi i percorsi, invece di affidarsi a quello che ciascun tokenizer si porta dietro. Se non lo fai, un test «passato» può nascondere due errori che si compensano.</p>
+        <p>Dettaglio dipendente dalla versione della libreria: verificalo sul tuo stack ispezionando l'attributo del template sul tokenizer che stai usando, non fidandoti di questa pagina.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:12px">Questa è la struttura di ogni diagnosi seria, e la rivedrai in M21: <strong>non «che sintomo vedo», ma «quale esperimento minimo elimina un'ipotesi, e in quale ordine»</strong>. L'ordine non è estetica: un test che non isola inquina quelli dopo.</p>
+
+    <p style="margin-top:16px">Solo <strong>dopo</strong> che A passa, il secondo controllo ha senso.</p>
+
+    <div class="note nozione">
+      <div class="mark">Controllo B<br>apprendimento</div>
+      <div class="body">
+        <p><strong>Domanda:</strong> il modello sta effettivamente imparando qualcosa di utile?</p>
+        <p>Qui i confronti sono fra misure <em>diverse</em> — batch diversi, momenti diversi — e quindi <strong>rumorose</strong>. Due batch dello stesso dataset danno loss diverse anche su un modello immobile, e la differenza non è trascurabile.</p>
+        <p>Questo significa che un singolo numero non conclude niente, in nessuna direzione: né «sta migliorando» né «non sta migliorando». Serve un insieme di valutazione tenuto da parte, misure ripetute, e un modo di dire quanto della differenza è segnale e quanto è rumore.</p>
+        <p><strong>Gli strumenti per farlo sono in M12</strong>, ed è per questo che M12 viene prima dei moduli sull'addestramento vero.</p>
+      </div>
+    </div>
+
+    <div class="note errore">
+      <div class="mark">La confusione<br>da evitare</div>
+      <div class="body">
+        <p>Una loss di addestramento <strong>diversa</strong> da quella della base non è di per sé un allarme, una volta che il controllo A è passato: in modalità di addestramento il dropout perturba il calcolo e su un singolo batch la spinge in entrambe le direzioni, i batch cambiano da un passo all'altro, e con un tasso di apprendimento alto i primi aggiornamenti possono peggiorare le cose prima di migliorarle.</p>
+        <p>Il segnale sospetto non è la direzione né l'entità: è <strong>«scarto oltre la tolleranza esattamente al passo zero, prima di qualunque aggiornamento, con tutto tenuto identico»</strong>. Quello è il controllo A, ed è l'unico che non ammette scuse.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:16px">La versione <code>log(V)</code> resta valida e utile in M03 e M09, dove il modello lo costruisci tu da zero e parte davvero dal caso.</p>
+    <p>Per riferimento, a inizializzazione casuale: vocabolario 32 000 → ≈ 10,4 · 128 000 → ≈ 11,8 · 256 000 → ≈ 12,5.</p>
+  </div>
+</details>
+
+<h3>Il gradiente che sorprende tutti</h3>
+
+<p>Mettendo insieme softmax e cross-entropy, la derivata della loss rispetto ai logit è:</p>
+
+<pre data-lab="lab_02_2"><code>∂L/∂z  =  p − y
+
+p = probabilità previste            es. [0.7, 0.2, 0.1]
+y = 1 sulla risposta giusta, 0 altrove   es. [0,   0,   1  ]
+∂L/∂z                                  = [0.7, 0.2, -0.9]</code></pre>
+
+<p>Nient'altro. Una sottrazione. Tutti gli esponenziali e i logaritmi si semplificano.</p>
+
+<p>E si legge in italiano: <em>«dove hai dato probabilità e non dovevi, abbassa; dove dovevi e non l'hai data, alza; in proporzione a quanto hai sbagliato»</em>. Se il modello è già perfetto, <code>p = y</code>, il gradiente è zero e nulla cambia.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li><code>dy/dx = −4</code>. Per far scendere <code>y</code>, <code>x</code> va aumentato o diminuito?</li>
+  <li>Un peso ha forma <code>[4096, 11008]</code>. Che forma ha il suo gradiente, e quanti byte occupa in float32?</li>
+  <li>Perché servono le attivazioni durante il calcolo all'indietro? Quale formula lo impone?</li>
+  <li>Cosa succede se ometti <code>zero_grad()</code> nel ciclo, e quale sintomo vedi nei log?</li>
+  <li>Modello <strong>inizializzato a caso</strong>, vocabolario da 32 000 voci: quanto deve valere la loss al primo passo, e cosa concludi se vale 0,3?</li>
+  <li>Stessa domanda ma per un <strong>LoRA su un modello preaddestrato</strong>: la loss al primo passo vale 1,8. È un problema? E qual è il controllo corretto in quel caso?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Aumentato.</strong> Derivata negativa significa che crescendo x, y cala.</p>
+    <p><strong>2.</strong> <code>[4096, 11008]</code>, identica. 45 088 768 elementi × 4 byte ≈ <strong>180 MB</strong>. Per <em>un solo</em> tensore di <em>un solo</em> strato.</p>
+    <p><strong>3.</strong> Perché <code>∂L/∂W = X.T @ (∂L/∂Y)</code> contiene <code>X</code>, cioè l'ingresso dello strato. Senza, il gradiente dei pesi non è calcolabile.</p>
+    <p><strong>4.</strong> I gradienti si sommano sui passi precedenti e l'aggiornamento diventa più grande del dovuto. Il <em>sintomo</em> non è univoco — nell'esperimento di M03 la loss oscilla con minimi occasionali che sembrano ottimi risultati, altrove può divergere a <code>NaN</code>. Per questo non si diagnostica dai log: si guarda il codice, o si stampa la norma del gradiente prima e dopo l'azzeramento.</p>
+    <p><strong>5.</strong> <code>log(32000) ≈ 10,4</code>. Se vale 0,3 il modello sta già indovinando: quasi certamente vede la risposta in ingresso — maschera della loss sbagliata o contaminazione dei dati.</p>
+    <p><strong>6.</strong> <strong>No, 1,8 è del tutto normale</strong>, e <code>log(V)</code> qui non si applica: il modello è già competente, non parte dal caso.</p>
+    <p>Il controllo corretto è il <strong>controllo di parità</strong>: loss del modello base e loss al passo zero, tutto tenuto identico (stesso batch, stessa maschera, stessa modalità, stessi generatori casuali, adattatore appena inizializzato). Devono <em>coincidere</em>, perché un LoRA all'inizializzazione non contribuisce all'uscita. È un esito binario: passa o non passa.</p>
+    <p>Se non coincidono, una delle condizioni che credevi identiche non lo è — e il valore 1,8 non c'entra. Se coincidono, il valore assoluto non ti dice nulla sulla qualità: quello lo misuri con un insieme tenuto da parte, in M12.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se hai risposto alla 6 applicando <code>log(V)</code>, è l'errore che questo modulo esiste per prevenire: <strong>un controllo valido in un regime, applicato al regime sbagliato, produce una diagnosi falsa</strong> — e ti manda a caccia di una contaminazione che non c'è.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

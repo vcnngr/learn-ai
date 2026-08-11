@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M11 — Dataset e loss masking</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m11">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M11 · 7 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Dataset e loss masking</h1>
+<p class="subtitle">Ogni difetto di questo modulo viene costruito di proposito e poi misurato, così sai che segnale cercare quando lo incontri per caso.</p>
+
+<p class="lede">I guasti del dataset hanno una caratteristica in comune: <strong>non producono errori</strong>. L'addestramento gira, la loss scende, il risultato è mediocre. Sono la classe di problemi più costosa da trovare, e la più economica da prevenire.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Due maschere di loss sulla stessa sequenza da 11 token. Entrambe hanno <strong>esattamente 5 posizioni attive</strong>.</p>
+    <ol>
+      <li>Sono equivalenti?</li>
+      <li>Un controllo che verifica «il numero di posizioni attive è quello atteso» le distingue?</li>
+      <li>Se una delle due è sfasata di una posizione, cosa impara il modello?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_11_1"><code>token                10    11    12    13    14    15    20    21    22    23    24
+maschera GIUSTA       .     .     .     .     .     .    20    21    22    23    24
+maschera SFASATA      .     .     .     .     .    15    20    21    22    23     .
+
+posizioni attive: giusta 5, sfasata 5   -> uguali? True
+posizioni in cui DIFFERISCONO, elemento per elemento: 2</code></pre>
+    <p><strong>1. No.</strong> <strong>2. No</strong>, il conteggio è identico. <strong>3.</strong> Il modello impara a prevedere ogni token a partire da un contesto spostato: una funzione sistematicamente sbagliata, che però ha una loss perfettamente decrescente.</p>
+    <p>È il difetto peggiore della categoria: <strong>coerente, silenzioso, e con tutti gli indicatori normali</strong>. Il solo modo di trovarlo è il confronto elemento per elemento.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 11.1<br>dataset</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_11_1_dataset.py</code></pre>
+  </div>
+</div>
+
+<h2>Packing</h2>
+
+<pre data-lab="lab_11_1"><code>5 esempi, lunghezza massima 6
+
+senza packing: 5 sequenze, 18 token di padding sprecati  (60%)
+con packing:   3 sequenze, 6 token sprecati
+  pacco 0: [1, 2, 3, 4, 5]
+  pacco 1: [6, 7, 8, 9, 10]
+  pacco 2: [11, 12]</code></pre>
+
+<p>Concatenare più esempi corti in una sequenza piena elimina il padding. Il 60% di spreco diventa 33%, e su dataset con lunghezze molto variabili il guadagno è maggiore.</p>
+
+<div class="note errore">
+  <div class="mark">Cosa rompe<br>il packing</div>
+  <div class="body">
+    <p>Dentro un pacco ci sono <strong>documenti diversi</strong>. Senza precauzioni l'attention del secondo documento guarda i token del primo, e il modello impara correlazioni fra testi che non c'entrano niente.</p>
+    <p>La difesa è una maschera di attention <strong>per documento</strong>: ogni documento vede solo sé stesso. Molte librerie la applicano, alcune no, e dipende dalla versione.</p>
+    <p><strong>Come verificarlo sul tuo stack</strong> — è un controllo diretto: costruisci un pacco con due documenti, passa maschera e <code>position_ids</code> esattamente come li passa il tuo codice di addestramento, e controlla che i pesi di attention <em>fra</em> i due documenti siano zero. Se non lo sono, il packing sta introducendo rumore invece di risparmiare.</p>
+    <p>Controlla anche i <code>position_ids</code>, ma sapendo cosa aspettarti. Con RoPE <em>pura</em> (M09) il punteggio dipende solo da <code>m−n</code>: se il secondo documento è già isolato dalla maschera e tutti i suoi indici ricevono lo <strong>stesso</strong> offset, le distanze interne non cambiano e i punteggi di attention restano gli stessi, a meno dell'arrotondamento. L'offset comune, da solo, non rompe niente.</p>
+    <p>Resta comunque un controllo da fare, perché il risultato dipende dall'implementazione: scaling delle posizioni (NTK, YaRN e simili), estrapolazione oltre la finestra addestrata, o meccanismi posizionali diversi da RoPE reagiscono all'offset. E se la maschera per documento <em>manca</em>, la numerazione continuata contribuisce a un calcolo già sbagliato. Verifica sul tuo stack quale delle due condizioni non tiene, invece di assumere che l'indice ripartito sia di per sé la correzione.</p>
+  </div>
+</div>
+
+<h2>Duplicati</h2>
+
+<pre><code>esempi totali:                    6
+unici per confronto ESATTO:       5
+unici dopo NORMALIZZAZIONE:       4</code></pre>
+
+<p>Un esempio differiva solo per maiuscole e spazi doppi. Il confronto esatto non lo vede, quello normalizzato sì. Già questo cambia il conteggio del 20%.</p>
+
+<h3>E i quasi-duplicati</h3>
+
+<pre data-lab="lab_11_1"><code>coppia   sim   testi
+0-1     1.00   'Come si configura il timeout del server?' / identico
+0-2     1.00   'Come si configura il timeout del server?' / con spazi diversi
+0-3     0.67   'Come si configura il timeout del server?' / '...del client?'</code></pre>
+
+<div class="note errore">
+  <div class="mark">La soglia non<br>è un parametro<br>universale</div>
+  <div class="body">
+    <p>La coppia <code>0-3</code> ha somiglianza <strong>0,67</strong> — alta — ma <em>non è un duplicato</em>: «server» e «client» sono due domande diverse ed entrambe utili.</p>
+    <p>Qualunque soglia tu scelga, taglierà anche esempi legittimi o lascerà passare duplicati. <strong>Non copiarla da un tutorial:</strong> scegline una guardando i casi al confine <em>nel tuo dominio</em>, e accetta che sia una decisione, non una misura.</p>
+  </div>
+</div>
+
+<h2>Contaminazione</h2>
+
+<pre data-lab="lab_11_1"><code>esempio di eval                              esatto  max sim  verdetto
+Spiega la differenza fra TCP e UDP.            True     1.00  CONTAMINATO
+come si configura il  timeout del server?      True     1.00  CONTAMINATO
+Come si abilita il logging su syslog?         False     0.00  pulito</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p><strong>La contaminazione non è una proprietà che un file possiede: è una relazione fra due insiemi.</strong> Per rilevarla servono tre cose, e senza una qualsiasi delle tre la domanda non ha risposta:</p>
+    <ol style="margin-bottom:6px">
+      <li>Il corpus di addestramento, per intero.</li>
+      <li>Una definizione operativa di «match» — esatto, normalizzato, semantico.</li>
+      <li>Una soglia.</li>
+    </ol>
+  </div>
+</div>
+
+<p>Il secondo esempio è istruttivo: differisce dall'originale solo per maiuscole e spazi. Un controllo esatto lo dichiarerebbe pulito; quello normalizzato lo trova. <strong>Il tuo insieme di valutazione può essere contaminato senza contenere una sola riga identica.</strong></p>
+
+<p>E quello che <em>nessun</em> controllo automatico cattura: parafrasi, traduzioni, lo stesso problema con numeri diversi. Su questi puoi solo dichiarare che non li cerchi.</p>
+
+<h2>Un validator vale quanto la sua spec</h2>
+
+<pre><code>  #  esito      problemi rilevati
+  0  OK         -
+  1  SCARTATO   template diverso da quello atteso
+  2  SCARTATO   risposta vuota
+  3  SCARTATO   probabile troncamento (78 caratteri)
+  4  SCARTATO   campo mancante: risposta</code></pre>
+
+<div class="note errore">
+  <div class="mark">Dichiara<br>cosa NON<br>controlli</div>
+  <div class="body">
+    <p><strong>Rileva:</strong> campi mancanti, template diverso dalla spec, risposte vuote, lunghezze anomale.</p>
+    <p><strong>Non rileva, e va scritto nero su bianco:</strong> risposte plausibili ma sbagliate nel merito, contaminazione (serve il corpus di riferimento), maschere errate (serve il tokenizer), sbilanciamento fra categorie, parafrasi di esempi già presenti.</p>
+    <p>«Il validator è passato» significa <em>nessuno dei controlli che ho scritto ha trovato qualcosa</em>. Non significa che il dataset sia buono. La differenza fra le due frasi è tutto quello che questo modulo ha da insegnare sui validator.</p>
+  </div>
+</div>
+
+<h2>Quanti esempi servono</h2>
+
+<div class="note errore">
+  <div class="mark">Nessun<br>numero</div>
+  <div class="body">
+    <p>Non ti do una regola del tipo «servono N esempi»: dipende dal compito, dal modello base, e da quanto quel compito è lontano da ciò che il modello già sa. <strong>Chiunque ti dia un numero senza quel contesto sta indovinando.</strong></p>
+  </div>
+</div>
+
+<p>Quello che puoi fare, ed è l'unico modo onesto, è <strong>misurare la curva</strong>:</p>
+
+<ol>
+  <li>Metti da parte una fetta per la valutazione, prima di ogni altra cosa.</li>
+  <li>Addestra con il 25%, il 50% e il 100% degli esempi rimasti.</li>
+  <li>Valuta tutti e tre sullo <strong>stesso</strong> insieme tenuto da parte.</li>
+  <li>Guarda l'andamento.</li>
+</ol>
+
+<p>Se la metrica è ancora in salita al 100%, altri dati aiuteranno. Se è piatta fra 50% e 100%, il problema <em>non è la quantità</em>: è la qualità, il metodo, o il compito stesso — e raccogliere altri diecimila esempi sarebbe tempo sprecato.</p>
+
+<p>Costa tre run invece di uno, e ti dice se il quarto ha senso. <strong>Ma tre punti rumorosi non sono una curva:</strong> per dire se una differenza è reale servono gli strumenti di M12, ed è il motivo per cui M12 viene subito dopo.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Due maschere hanno entrambe 512 posizioni attive su 2048. Cosa devi confrontare per sapere se sono equivalenti?</li>
+  <li>Il packing riduce lo spreco dal 60% al 33%. Quale controllo devi fare prima di attivarlo?</li>
+  <li>Il tuo dedup esatto non trova duplicati. Il dataset è pulito?</li>
+  <li>Due esempi hanno somiglianza 0,67. Vanno eliminati?</li>
+  <li>Il validator passa su tutti i 50 000 esempi. Cosa hai imparato?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Il tensore delle etichette <strong>elemento per elemento</strong>: quali posizioni valgono <code>-100</code> e quali no, e con che allineamento. Il conteggio è identico anche con uno sfasamento, che è il caso peggiore.</p>
+    <p><strong>2.</strong> Che l'attention fra documenti diversi dentro lo stesso pacco sia <strong>zero</strong>: è questo il controllo che decide se stai addestrando su correlazioni inventate. I <code>position_ids</code> che ripartono a ogni documento sono la convenzione da tenere, ma sono il controllo secondario — con RoPE pura e maschera corretta un offset comune non cambia i punteggi, mentre con scaling o altri schemi posizionali sì.</p>
+    <p><strong>3.</strong> <strong>No.</strong> Non trova nemmeno differenze di maiuscole o spaziatura — nel lab quel solo passaggio cambia il conteggio di unici da 5 a 4. Normalizza prima di confrontare, e poi cerca i quasi-duplicati.</p>
+    <p><strong>4.</strong> <strong>Non lo sai da quel numero.</strong> Nel lab, 0,67 è la somiglianza fra «timeout del server» e «timeout del client»: due esempi diversi ed entrambi utili. La soglia va scelta guardando i casi al confine del <em>tuo</em> dominio.</p>
+    <p><strong>5.</strong> Che nessuno dei controlli che hai scritto ha trovato qualcosa. Nient'altro — in particolare niente sul merito delle risposte, sulla contaminazione o sulle maschere, a meno che tu non li abbia esplicitamente implementati.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

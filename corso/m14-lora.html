@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M14 — LoRA, QLoRA, DoRA</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m14">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M14 · 9 h · <span class="pill cpu">CPU · solo numpy</span></p>
+<h1>LoRA, QLoRA, DoRA</h1>
+<p class="subtitle">Il cuore tecnico del tuo problema. Ogni affermazione di questo modulo è verificata numericamente — il merge non viene spiegato, viene dimostrato.</p>
+
+<p class="lede">LoRA è algebra lineare, non magia: <code>W_eff = W + (alpha/r)·B·A</code>. Tutto quello che devi decidere — <code>r</code>, <code>alpha</code>, <code>target_modules</code>, se quantizzare — segue da cosa quella formula può e non può rappresentare.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Stai confrontando due configurazioni LoRA sul modello di riferimento: <code>r=8</code> e <code>r=32</code>, con <code>alpha=16</code> in entrambe.</p>
+    <ol>
+      <li>Cosa hai cambiato fra i due esperimenti? Una cosa o due?</li>
+      <li><code>target_modules</code> su tutta l'attention, oppure solo sull'MLP: quale delle due tocca <em>più</em> parametri?</li>
+      <li>Dopo il merge, il modello fuso è identico a base+adattatore, o è un'approssimazione?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1. Due.</strong> Il fattore di scala è <code>alpha/r</code>, non <code>alpha</code>. Passando da <code>r=8</code> a <code>r=32</code> con <code>alpha</code> fisso, la scala passa da <strong>2,0</strong> a <strong>0,5</strong>: hai aumentato l'espressività <em>e</em> indebolito l'aggiornamento di quattro volte. Qualunque differenza osservi, non sai a quale delle due attribuirla.</p>
+    <p><strong>2. L'MLP</strong>, e non di poco:</p>
+    <pre data-lab="lab_14_1"><code>target_modules                moduli/strato         r=16  % del tot
+q,v (il default più comune)               2   12,247,040     0.045%
+q,k,v,o (tutta l'attention)               4   24,494,080     0.091%
+solo MLP                                  3   41,828,352     0.155%
+tutti e sette                             7   66,322,432     0.246%</code></pre>
+    <p>L'MLP ha <em>meno</em> moduli ma matrici molto più grandi. È la stessa asimmetria che avevi misurato in M04 su un checkpoint vero.</p>
+    <p><strong>3. Algebricamente equivalente</strong>, non approssimato — ma nemmeno identico bit per bit: <code>max|diff| = 2.2·10⁻¹⁵</code>, dentro la tolleranza del <code>float64</code> di NumPy su queste forme.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 14.1<br>LoRA</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_14_1_lora.py</code></pre>
+    <p>Scritto in <strong>numpy</strong>, non PyTorch: LoRA è algebra lineare, e vederla senza framework rende evidente che non c'è niente di speciale sotto.</p>
+  </div>
+</div>
+
+<h2>rank e alpha fanno cose diverse</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <pre style="margin:10px 0"><code>W_eff = W + (alpha / r) · B · A
+
+r      quanto è ESPRESSIVO l'aggiornamento (il rango della matrice)
+alpha  quanto è FORTE       (un fattore di scala)</code></pre>
+    <p>Il fattore applicato è <code>alpha/r</code>. Quindi <code>r</code> compare in <strong>entrambi</strong> gli effetti, e cambiarlo da solo non isola niente.</p>
+  </div>
+</div>
+
+<pre data-lab="lab_14_1"><code>    r   alpha   scala alpha/r
+    4      16           4.000     alpha FISSO: più r, più DEBOLE l'aggiornamento
+    8      16           2.000
+   16      16           1.000
+   32      16           0.500
+   64      16           0.250
+
+    4       8           2.000     alpha = 2r: scala COSTANTE,
+    8      16           2.000     cambia solo l'espressività
+   16      32           2.000
+   32      64           2.000</code></pre>
+
+<p>La convenzione diffusa di tenere <code>alpha = 2r</code> (o <code>alpha = r</code>) serve esattamente a questo: <strong>cambiare una variabile alla volta</strong>. Non è una regola magica, è disegno sperimentale.</p>
+
+<h2>Cosa un rango <code>r</code> può rappresentare</h2>
+
+<pre data-lab="lab_14_1"><code>    r   errore relativo   varianza spiegata
+    1            0.9924                1.5%
+    4            0.9701                5.9%
+   16            0.8885               21.1%
+   64            0.6140               62.3%
+  128            0.3249               89.4%
+  256            0.0000              100.0%</code></pre>
+
+<p>Un aggiornamento di rango <code>r</code> può rappresentare al più una matrice di rango <code>r</code>. La tabella misura la <em>migliore approssimazione possibile</em> (quella dell'SVD) di un bersaglio di rango pieno 256×256.</p>
+
+<div class="note errore">
+  <div class="mark">L'ipotesi<br>su cui LoRA<br>si regge</div>
+  <div class="body">
+    <p>Su un bersaglio <strong>casuale</strong> l'energia è distribuita su tutti i ranghi, e un rango basso approssima malissimo: <code>r=16</code> cattura solo il 21% della varianza.</p>
+    <p>LoRA funziona perché un aggiornamento <em>utile</em> di fine-tuning non è casuale: se il compito è ristretto, il cambiamento necessario tende ad avere pochi ranghi dominanti.</p>
+    <p><strong>Ma è un'ipotesi sul tuo compito, non un teorema.</strong> Se il tuo fine-tuning richiede un cambiamento diffuso — una lingua nuova, un dominio molto lontano dal pretraining — un rango basso non ce la fa, e nessun learning rate lo compensa.</p>
+    <p><strong>Il segnale osservabile:</strong> aumentando <code>r</code> (a <code>alpha/r</code> costante) la metrica continua a migliorare invece di appiattirsi. Se succede, il rango è il vincolo. Se la curva è piatta da <code>r=8</code> in su, il rango non è il tuo problema e aumentarlo è spreco. Misuralo con gli strumenti di M12 — tre valori senza intervalli non sono una curva.</p>
+  </div>
+</div>
+
+<h2>Il merge, dimostrato</h2>
+
+<pre data-lab="lab_14_1"><code>base + adattatore attivo   vs   pesi fusi
+  max|diff| = 2.220e-15   OK
+  forma di W: (256, 128), invariata dopo il merge: (256, 128)</code></pre>
+
+<p><strong>Equivalente in algebra, non identico in precisione finita.</strong> <code>W + (alpha/r)·B·A</code> è una matrice della stessa forma di <code>W</code>: in aritmetica esatta il merge è la stessa funzione riscritta, non un'approssimazione. In precisione finita lo scarto non è zero — nel lab, in <code>float64</code>, è <code>2.220e-15</code>, perché le moltiplicazioni avvengono in ordine diverso e ogni ordine arrotonda a modo suo.</p>
+
+<p>La distinzione non è pedanteria. <strong>«Identico bit per bit» è un'affermazione da riservare a un confronto che dia davvero uguaglianza esatta</strong>; qui la verifica corretta è «scarto entro una tolleranza dichiarata per questo dtype e questo backend». M20 mostra il seguito: se fondi in <code>bf16</code> invece che in <code>fp32</code>, lo stesso scarto cresce di tre ordini di grandezza.</p>
+
+<div class="note errore">
+  <div class="mark">Conseguenza<br>operativa</div>
+  <div class="body">
+    <p>Dopo il merge <strong>l'adattatore non esiste più come oggetto separato</strong>. Non puoi spegnerlo, non puoi scambiarlo con un altro, non puoi servire più adattatori sulla stessa base.</p>
+    <p>Se ti serve alternare adattatori a runtime — un caso comune quando si servono più clienti o più compiti — <strong>non fondere</strong>. È una decisione di architettura, non di ottimizzazione.</p>
+  </div>
+</div>
+
+<h2>Perché <code>B</code> parte da zero</h2>
+
+<pre data-lab="lab_14_1"><code>al passo 0, con B = 0:  max|diff| dalla base = 0.000e+00
+
+gradiente su B all'init: norma 0.0181   -> non nullo, l'adattatore impara
+gradiente su A all'init: norma 0.0000   -> nullo finché B è 0, poi si sblocca
+con B non nullo:  grad A = 0.0214   grad B = 0.0181</code></pre>
+
+<div class="note nozione">
+  <div class="mark">L'unica<br>combinazione<br>che funziona</div>
+  <div class="body">
+    <p><strong>Zero esatto</strong> sullo scarto: il modello con adattatore appena inizializzato <em>è</em> il modello base. È esattamente ciò che rende possibile il controllo di parità di M02.</p>
+    <ul>
+      <li><code>A</code> e <code>B</code> entrambi <strong>a zero</strong> → gradiente nullo su entrambi, l'adattatore non impara mai nulla.</li>
+      <li>Entrambi <strong>casuali</strong> → il modello parte già degradato, e la parità fallisce senza che ci sia un bug.</li>
+      <li>Uno casuale, uno a zero → partenza neutra <em>e</em> gradiente non nullo. È l'unica combinazione che dà entrambe le cose.</li>
+    </ul>
+    <p>Nota il dettaglio nei numeri: all'inizio <strong>solo <code>B</code> riceve gradiente</strong>. <code>A</code> resta fermo finché <code>B</code> è zero, e si sblocca dopo il primo aggiornamento.</p>
+  </div>
+</div>
+
+<h2>QLoRA: il prezzo della quantizzazione</h2>
+
+<pre data-lab="lab_14_1"><code>  bit   errore relativo   byte/parametro
+    8            0.0059            1.031
+    4            0.1077            0.531
+    3            0.2513            0.406
+
+effetto sull'USCITA con 4 bit: errore relativo 0.1073</code></pre>
+
+<p>A 4 bit l'errore sui pesi è circa il <strong>10,8%</strong>, e si trasferisce quasi intatto all'uscita (10,7%). Non è rumore trascurabile: è un modello <em>diverso</em> da quello con la base piena.</p>
+
+<div class="note errore">
+  <div class="mark">Due cose<br>da notare</div>
+  <div class="body">
+    <p><strong>Le scale non sono gratis.</strong> Con <em>questo</em> quantizzatore — 4 bit più una scala <code>fp16</code> ogni 64 valori — il costo è <code>0,53125</code> byte per parametro, non 0,5. Su 27 miliardi fa circa <strong>840 MB di sole scale</strong>, e il totale statico di M06 passerebbe da 15,4 a circa <strong>16,2 GB</strong>.</p>
+    <p><strong>Ma è il conto del quantizzatore giocattolo di questo lab.</strong> Una implementazione QLoRA reale ha metadati, codici, eventuale doppia quantizzazione e scale di dtype diverso: il costo per parametro va <em>contato sui buffer effettivi</em> dello stack che usi, dichiarando versione e configurazione. Il punto da portare via non è il numero <code>0,53125</code>, è che <strong>il costo non è mai esattamente «bit/8»</strong> — e che la differenza va misurata, non stimata.</p>
+    <p><strong>L'adattatore compensa in parte, non annulla.</strong> Parti da un modello degradato e ci addestri sopra: il risultato non è equivalente allo stesso LoRA su base piena.</p>
+    <p>Il baratto è esplicito, e in M06 l'hai già calcolato: QLoRA porta lo statico del tuo 27B da <strong>55,9 a 15,4 GB</strong>. Se quei 40 GB ti servono per far entrare l'addestramento, l'errore è il prezzo. <strong>Se non ti servono, stai pagando un degrado in cambio di niente.</strong></p>
+  </div>
+</div>
+
+<h2>DoRA</h2>
+
+<pre data-lab="lab_14_1"><code>W (256, 128) -> magnitudine (1, 128) + direzione (256, 128)
+ricostruzione m * direzione == W ?  max|diff| = 2.776e-17
+parametri extra rispetto a LoRA: 128 (uno per colonna)</code></pre>
+
+<p>DoRA scompone la matrice in <strong>magnitudine</strong> (una norma per colonna) e <strong>direzione</strong> (colonne normalizzate), e le aggiorna separatamente: l'aggiornamento a basso rango agisce sulla sola direzione, mentre la magnitudine diventa un parametro a sé.</p>
+
+<div class="note errore">
+  <div class="mark">Non è<br>«LoRA con<br>un altro rango»</div>
+  <div class="body">
+    <p>È una <strong>parametrizzazione diversa</strong>: cambia <em>cosa</em> viene parametrizzato, non solo quanto. Confrontare DoRA e LoRA «a parità di rango» non è un confronto a parità di capacità.</p>
+    <p>I dettagli implementativi — come si normalizza, cosa è addestrabile, come si fonde — <strong>dipendono dalla libreria e dalla versione</strong>. Verificali sul tuo stack invece di assumerli da questa pagina.</p>
+  </div>
+</div>
+
+<h2>I cinque controlli sul LoRA del caso di studio</h2>
+
+<ol>
+  <li><strong>Quanti parametri addestrabili hai davvero?</strong> Contali: <code>r × (in+out) × moduli × strati</code>. Se sono lo 0,045% del modello (<code>q,v</code> a <code>r=16</code>) e il compito è lontano dal dominio base, il rango può essere il vincolo.</li>
+  <li><strong>Hai cambiato <code>r</code> fra due esperimenti lasciando <code>alpha</code> fisso?</strong> Allora hai cambiato anche la scala, e il confronto non isola niente.</li>
+  <li><strong><code>target_modules</code> include l'MLP?</strong> Solo attention tocca meno della metà dei parametri che toccherebbe includendolo.</li>
+  <li><strong>Il controllo di parità di M02 passa?</strong> Con <code>B</code> a zero <em>deve</em> dare scarto nullo. Se non lo dà, il problema è la configurazione dell'adattatore, non i dati.</li>
+  <li><strong>Stai usando QLoRA senza averne bisogno?</strong> Se lo statico ci sta in memoria senza quantizzare, stai pagando un errore del 10% in cambio di niente.</li>
+</ol>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li><code>r=64</code>, <code>alpha=16</code>. Qual è il fattore di scala applicato all'aggiornamento?</li>
+  <li>Aumenti <code>r</code> da 8 a 64 (con <code>alpha/r</code> costante) e la metrica non migliora. Cosa concludi?</li>
+  <li>Dopo il merge puoi ancora servire due adattatori diversi sulla stessa base?</li>
+  <li>Il tuo controllo di parità dà uno scarto di 0,3. Dove guardi per primo?</li>
+  <li>QLoRA a 4 bit su 27B: quanto costano davvero le scale di quantizzazione?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>16/64 = <strong>0,25</strong></code>. L'aggiornamento è attenuato di quattro volte rispetto a <code>alpha=r</code>.</p>
+    <p><strong>2.</strong> Che <strong>il rango non è il vincolo</strong>: l'aggiornamento necessario ha pochi ranghi dominanti e li stai già catturando. Aumentare <code>r</code> è spreco di memoria e tempo. Il collo è altrove — dati, template, learning rate, o il metodo stesso.</p>
+    <p><strong>3.</strong> <strong>No.</strong> Dopo il merge l'adattatore è dentro <code>W</code> e non è più separabile. Se ti serve alternarli, non fondere.</p>
+    <p><strong>4.</strong> Alla <strong>inizializzazione dell'adattatore</strong>: <code>B</code> deve essere esattamente zero. È l'unica causa che produce uno scarto non nullo anche su un singolo esempio, con tutto il resto tenuto identico. Poi, in ordine: modalità e seme, template, tokenizer, maschera (M02).</p>
+    <p><strong>5.</strong> Con <em>questo</em> quantizzatore, blocchi da 64 e scale fp16: <code>27·10⁹ × 2/64 ≈ <strong>840 MB</strong></code>, cioè 0,53125 byte per parametro invece di 0,5. Su uno stack reale il numero cambia — vanno contati i buffer effettivi.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

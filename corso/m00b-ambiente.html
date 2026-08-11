@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M00b — Mettere in piedi l'ambiente</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m00b">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M00b · 1 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Mettere in piedi l'ambiente</h1>
+<p class="subtitle">Un'ora spesa qui evita di scoprire a M07 che due sezioni non gireranno mai su questa macchina.</p>
+
+<p class="lede">Questo modulo non insegna niente sul funzionamento dei modelli. Serve a rispondere a una domanda sola, <strong>prima</strong> di investire nove mesi: <em>che cosa, di questo corso, posso davvero eseguire io?</em></p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Senza guardare, rispondi:</p>
+    <ol>
+      <li>Quanta parte del corso pensi di poter eseguire <strong>senza GPU</strong>?</li>
+      <li>Se un lab usa un'API che la tua versione di PyTorch non ha, cosa ti aspetti che succeda?</li>
+      <li>Cambiando <code>modello.parametri</code> in <code>profilo.js</code>, quali numeri delle pagine si aggiornano?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Quasi tutto.</strong> Su 26 lab, due sezioni richiedono CUDA: M07 sezioni 4–5 e M18 sezione 5. Tutto il resto — inclusa l'<em>aritmetica</em> della memoria di M06 e la teoria del parallelismo di M18 — gira su un portatile.</p>
+    <p><strong>2.</strong> <strong>Non fallisce.</strong> I lab interessati hanno due strade e dichiarano quale hanno eseguito. La strada di riserva è verificata e dà lo stesso risultato matematico; quello che perdi è la possibilità di controllare il ramo nativo, e il corso lo scrive come «non verificabile» invece di darlo per funzionante.</p>
+    <p><strong>3.</strong> <strong>Nessuno.</strong> È la risposta che sorprende, e c'è una sezione apposta più sotto. Il profilo aggiorna l'intestazione delle pagine e ti dà i valori da passare ai lab; <em>non</em> ricalcola i numeri già scritti.</p>
+  </div>
+</details>
+
+<h2>Cosa serve davvero</h2>
+
+<p>Meno di quanto sembri. Non c'è un framework da imparare, non c'è un ambiente da orchestrare, non c'è niente da containerizzare:</p>
+
+<table>
+<tr><th>Serve</th><th>Non serve</th></tr>
+<tr><td>Python 3.9 o superiore</td><td>Una GPU, fino a M07</td></tr>
+<tr><td><code>torch</code>, <code>numpy</code>, <code>safetensors</code></td><td>Account, chiavi API, connettività</td></tr>
+<tr><td>Un terminale</td><td>Notebook, IDE, framework di training</td></tr>
+<tr><td>Saper leggere ed eseguire Python</td><td>Saperlo scrivere bene</td></tr>
+</table>
+
+<p>Gli script in <code>corso/labs/</code> sono autonomi: nessun import fra un lab e l'altro, nessun file di configurazione, nessun ordine obbligato. Ognuno si lancia da solo e stampa quello che misura.</p>
+
+<div class="note lab">
+  <div class="mark">Lab 00.1<br>ambiente</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_00_1_ambiente.py</code></pre>
+    <p>Non installa niente e non cambia niente: guarda, misura e dice cosa potrai eseguire. È il primo lab da lanciare, ed è anche il primo esempio del metodo — invece di dirti «serve un Python recente», ti dice <em>quale</em> hai e <em>cosa</em> ci puoi fare.</p>
+  </div>
+</div>
+
+<h2>Il verdetto, su questa macchina</h2>
+
+<p>L'output qui sotto viene dalla macchina su cui il corso è stato scritto. <strong>Il tuo sarà diverso, ed è il punto:</strong> serve a farti leggere il <em>tuo</em>.</p>
+
+<pre data-lab="lab_00_1"><code>  python                 3.12.2
+  eseguibile             /usr/local/bin/python3
+  sistema                Darwin 24.6.0
+  architettura           x86_64
+
+  pacchetto        versione       serve a
+  torch            2.2.2          tutto: tensori, autograd, addestramento
+  numpy            1.26.4         i lab di algebra e i conti su array
+  safetensors      0.8.0          aprire un checkpoint e leggerne i pesi
+
+  y = x^3 con x = 2  ->  dy/dx misurato 12.0, atteso 12.0   OK</code></pre>
+
+<p>L'ultima riga è il controllo che conta. Se dice <code>OK</code>, autograd funziona — e con esso tutta la Parte I e la Parte II, cioè le prime venticinque ore.</p>
+
+<h3>Gli acceleratori, e cosa succede senza</h3>
+
+<pre data-lab="lab_00_1"><code>  CUDA disponibile         NO
+  MPS (Apple) disponibile  SI</code></pre>
+
+<div class="note errore">
+  <div class="mark">Senza CUDA<br>si ferma<br>poco — ma<br>si ferma</div>
+  <div class="body">
+    <p>Due sezioni non sono eseguibili: <strong>M07 sezioni 4–5</strong> (picco di memoria e gradient checkpointing) e <strong>M18 sezione 5</strong> (memoria per rank e scaling con <code>torchrun</code>).</p>
+    <p>Si fermano <em>pulite</em>, con un messaggio esplicito, e soprattutto <strong>non stampano numeri stimati al posto di quelli misurati</strong>. Sarebbero inventati, ed è esattamente ciò che il corso insegna a non fare.</p>
+    <p><strong>MPS non sostituisce CUDA</strong> per quei due lab: usano <code>torchrun</code> e NCCL, che su MPS non esistono. Averlo non cambia il verdetto.</p>
+    <p>Va detto anche il rovescio: <strong>quelle due sezioni non sono mai state eseguite nemmeno da chi ha scritto il corso.</strong> Il codice si ferma come promesso — quello è verificato — ma i numeri che produce su hardware vero restano da controllare. Se hai una GPU, sei nella posizione di scoprire un difetto che qui non si poteva vedere.</p>
+  </div>
+</div>
+
+<h3>Le API che dipendono dalla versione</h3>
+
+<pre data-lab="lab_00_1"><code>  API                                          presente   se assente
+  F.rms_norm                                   NO         il lab usa la formula di riferimento scritta a mano
+  scaled_dot_product_attention(enable_gqa=)    NO         il lab espande le teste K/V a mano</code></pre>
+
+<p>Due strade per lo stesso calcolo non sono pigrizia: servono perché il corso deve dichiarare <em>quale</em> ha eseguito. Le due possono dare le ultime cifre diverse, e un numero pubblicato senza dire da quale ramo viene è un numero non verificabile.</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte</div>
+  <div class="body">
+    <p>È lo stesso problema di un binario compilato con flag diversi: gira, dà quasi lo stesso risultato, e quando non torna nessuno sa perché — perché nessuno ha registrato con quali flag era stato compilato.</p>
+    <p>Qui la contromisura ha un nome e arriva in M15: si chiama <strong>manifest</strong>, e questo lab ne è la versione minima.</p>
+  </div>
+</div>
+
+<h2>Quando un lab non gira</h2>
+
+<p>Prima o poi succede. Tre casi, in ordine di frequenza, e cosa fare in ciascuno.</p>
+
+<div class="note errore">
+  <div class="mark">Leggere<br>un errore<br>di versione</div>
+  <div class="body">
+    <p><strong>1. <code>ModuleNotFoundError</code>.</strong> Manca un pacchetto. Lo installi e riprovi. È l'unico dei tre che si risolve con <code>pip</code>.</p>
+    <p><strong>2. <code>AttributeError: module 'torch...' has no attribute 'X'</code>.</strong> Il pacchetto c'è, ma la tua versione non ha quella funzione. <strong>Non è un errore tuo</strong>, ed è quasi sempre una API aggiunta dopo. Il lab 00.1 elenca quelle che il corso usa; se ne trovi una non elencata, è una lacuna del corso — segnalala.</p>
+    <p><strong>3. <code>pip</code> dice <code>no matching distribution found</code>.</strong> Il più frustrante, perché sembra un problema di rete e non lo è: significa che per la tua combinazione di <em>Python + sistema operativo + architettura</em> quel pacchetto non è pubblicato affatto.</p>
+    <p>Succede davvero, ed è successo qui: il corso è stato scritto su un Mac Intel, dove <code>torch 2.2.2</code> è <strong>l'ultima versione disponibile</strong> — le build x86 per macOS non vengono più pubblicate. Non c'è niente da aggiustare: si registra il vincolo e si va avanti sapendo quali rami non si potranno verificare.</p>
+    <p><strong>La cosa da non fare</strong> è concludere «l'ambiente è rotto» e cominciare a reinstallare. Le prime due domande sono sempre <em>quale versione ho</em> e <em>quale versione serve</em> — e la prima te la risponde il lab 00.1.</p>
+  </div>
+</div>
+
+<h2>Il profilo: cosa fa e cosa no</h2>
+
+<p>Il file <code>assets/profilo.js</code> descrive hardware, modello di riferimento e caso di studio. La distinzione che segue costa una riga da leggere e fa risparmiare un pomeriggio.</p>
+
+<table>
+<tr><th>Il profilo</th><th>Cosa comporta</th></tr>
+<tr><td><strong>Fa</strong> — aggiorna l'intestazione delle pagine, e ti dà i valori da passare ai lab parametrici</td><td><code>python3 lab_06_1_memoria.py --params 8e9 --gpus 4 --hbm 80</code></td></tr>
+<tr><td><strong>Non fa</strong> — non ricalcola i numeri già scritti nelle pagine</td><td>I 54 GB, i 432 GB e i conteggi LoRA restano quelli del profilo di riferimento</td></tr>
+</table>
+
+<div class="note errore">
+  <div class="mark">Le pagine<br>sono un<br>caso svolto</div>
+  <div class="body">
+    <p>Cambiare <code>modello.parametri</code> da 27B aspettandosi che le tabelle seguano è l'errore naturale, e le tabelle resteranno ferme.</p>
+    <p><strong>Il metodo è tuo, i numeri sono suoi.</strong> Le pagine mostrano un caso svolto per intero su un hardware dichiarato; per avere i tuoi numeri, rifai il conto con i lab parametrici. È più lavoro di quanto vorresti, ed è anche l'unico modo in cui il conto diventa davvero tuo.</p>
+    <p>I campi che spostano di più, in ordine: <code>modello.parametri</code> (entra in ogni conto di M06), <code>gpu.memoriaGB</code> (decide cosa ci sta), <code>gpu.quante</code> (cambia il batch effettivo di M08 e tutto M18), <code>caso.lora</code> (da lì esce la frazione di addestrabili usata da M06 e M17).</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Lancia il lab 00.1. Quante sezioni del corso <em>non</em> potrai eseguire, e quali?</li>
+  <li>Un lab stampa <code>AttributeError: ... has no attribute 'rms_norm'</code>. Che cosa fai?</li>
+  <li>Hai cambiato <code>modello.parametri</code> a <code>8e9</code>. La tabella dei 432 GB in M06 ora è sbagliata?</li>
+  <li>Il tuo <code>pip</code> rifiuta di installare una versione di torch più recente. Quanto del corso perdi?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Dipende dalla tua macchina, ed è il motivo per cui va lanciato. Senza CUDA: <strong>due</strong>, M07 sezioni 4–5 e M18 sezione 5. Con CUDA e una versione recente di torch: nessuna.</p>
+    <p><strong>2.</strong> <strong>Niente</strong>, se il lab prosegue: sta usando la strada di riserva e lo dichiara. Se invece <em>si ferma</em>, è un difetto del corso — quel ramo doveva avere un fallback — e va segnalato. In nessuno dei due casi la risposta è reinstallare l'ambiente.</p>
+    <p><strong>3.</strong> <strong>No, ma non è più il tuo caso.</strong> Quella tabella resta corretta per un modello da 27B, che è ciò che dichiara. Per il tuo modello da 8B rifai il conto: <code>lab_06_1_memoria.py --params 8e9</code>. La pagina è un caso svolto, non un foglio di calcolo.</p>
+    <p><strong>4.</strong> <strong>Molto poco, e sai esattamente quanto:</strong> i rami nativi di M09 (<code>F.rms_norm</code>, <code>enable_gqa</code>), che restano non verificabili. Il contenuto matematico è lo stesso — i lab lo calcolano a mano e lo confrontano con la formula di riferimento.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La risposta che accomuna le quattro: <strong>un ambiente diverso da quello del corso non è un problema da risolvere, è un dato da registrare.</strong> Quando un numero non tornerà — e succederà — la prima domanda sarà «quale versione ho?». In M15 questo diventa il manifest di un addestramento; qui è la sua versione minima.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

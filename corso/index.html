@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capire, addestrare, diagnosticare — corso</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="index">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">Da zero assoluto · per ingegneri di sistema</p>
+<h1>Smettere di usare i modelli.<br>Cominciare a capirli.</h1>
+<p class="subtitle">Nessun prerequisito matematico. Ogni concetto astratto finisce in un <code>print()</code>: nome del tensore, forma, tipo, riga di codice. Se non puoi stamparlo, non è ancora tuo.</p>
+
+<p class="lede">Questo corso è scritto per chi sa mandare in produzione un motore di inferenza, sa dove va la memoria di un nodo e perché uno storage rallenta — e per cui quello che c'è <em>dentro</em> il modello è ancora una scatola chiusa: pesi mai aperti, addestramenti che o funzionano o no senza che si sappia dire perché.</p>
+
+<p>Apre la scatola. Parte dal significato di «numero moltiplicato per una matrice» e arriva a diagnosticare con metodo un caso reale: <strong>un adattatore LoRA su un modello denso da 27B che rende meno del previsto</strong>, senza che nessuno sappia se la colpa sia dei dati, degli iperparametri, del template, della valutazione o di un disallineamento fra addestramento e inferenza.</p>
+
+<p>Quel caso attraversa tutto il corso ed è l'ultimo modulo.</p>
+
+<div class="note nozione">
+  <div class="mark">Adattarlo<br>al tuo caso</div>
+  <div class="body">
+    <p>Hardware, modello di riferimento e caso di studio sono dichiarati in <code>assets/profilo.js</code>. Cambiando quei valori si aggiorna l'intestazione delle pagine, e i lab che accettano parametri — come il calcolatore di memoria di M06 — si eseguono sui tuoi numeri:</p>
+    <pre style="margin:10px 0"><code>python3 corso/labs/lab_06_1_memoria.py --params 8e9 --gpus 4 --hbm 80</code></pre>
+    <p>Il campo che conta più di tutti è <code>regime</code>: GPU singola, più schede in un nodo, memoria unificata, cluster, noleggio. Non cambia i numeri — cambia <em>quale vincolo morde</em>, ed è il tema di <strong>M18b</strong>.</p>
+    <p><strong>Quello che il profilo NON fa</strong>, ed è bene saperlo prima: <em>non riscrive i numeri già stampati nelle pagine</em>. I 54 GB, i 432 GB, le forme dei tensori e i conteggi LoRA restano quelli del profilo di riferimento — un denso da 27B su due schede da 141 GB. Vanno letti come <strong>un caso svolto</strong>: il metodo è tuo, i numeri sono suoi.</p>
+    <p><strong>Quello che invece fa</strong>, da M06 in poi: accanto a ogni tabella di memoria compare il <em>tuo</em> ricalcolo, con le stesse formule del lab. Che le due strade coincidano non è un atto di fede — lo verifica <code>tools/parity_conti.py</code> a ogni rilascio, con uguaglianza esatta.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Prima di tutto il resto</div>
+  <div class="body">
+    <p><strong>Con <em>N</em> schede da <em>M</em> GB non hai <em>N</em>×<em>M</em> GB di memoria. Hai <em>N</em> volte <em>M</em> GB, separate.</strong></p>
+    <p>Un'interconnessione veloce rende rapido lo scambio di dati fra le schede. Non le fonde in un unico spazio di indirizzamento. Un modello che non sta in una scheda non «ci sta comunque»: va spezzato, e come lo spezzi cambia completamente il conto.</p>
+    <p>È l'errore numero uno di chi arriva dall'infrastruttura, dove sommare le risorse di un pool è il gesto naturale. Qui non lo è, e nessun calcolo di capienza funziona finché quel riflesso non è disinnescato. I numeri arrivano in <strong>M06</strong>.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Con una eccezione, e riguarda alcuni di voi.</strong> Sulle macchine a <em>memoria unificata</em> — DGX Spark, Grace — il pool è davvero uno solo, condiviso fra CPU e acceleratore. Lì la somma non è sbagliata: è sbagliata la domanda. La capienza smette di essere il vincolo e comincia a esserlo la <strong>banda</strong>. È uno dei quattro regimi di <strong>M18b</strong>.</p>
+  </div>
+</div>
+
+<h2>Cosa saprai fare</h2>
+
+<p>Cinque capacità verificabili. Sono il metro di misura del corso, non slogan: ognuna si controlla facendoti fare una cosa, non facendoti dire che l'hai capita.</p>
+
+<ol class="goals">
+  <li><strong>Aprire un modello e leggerne i pesi</strong>, tensore per tensore: nome, forma, tipo numerico, funzione. Contare i parametri a mano e ritrovare il numero dichiarato.</li>
+  <li><strong>Calcolare prima di lanciare</strong> se un addestramento entra nella memoria di una GPU — e, quando non entra, sapere quale termine del conto avevi sbagliato.</li>
+  <li><strong>Scegliere il metodo</strong> fra full fine-tuning, LoRA, QLoRA, DPO, RL, distillazione. Soprattutto: saper dire quando ciascuno è la scelta <em>sbagliata</em>, e perché.</li>
+  <li><strong>Diagnosticare un addestramento fallito con metodo</strong>: ipotesi in ordine di costo, un esperimento che ne falsifica una sola alla volta, criterio di decisione scritto <em>prima</em> di eseguire.</li>
+  <li><strong>Addestrare un modello piccolo da zero</strong>, scritto riga per riga da te, e vedere la loss scendere sapendo esattamente perché scende.</li>
+</ol>
+
+<h2>Due percorsi</h2>
+
+<p>Il percorso completo, a 4 ore a settimana, è quasi un anno. È dichiarato onestamente, ma per molti significa non cominciare affatto — e chi deve solo capire <em>perché il suo fine-tuning non funziona</em> non ha bisogno di scrivere un transformer da zero.</p>
+
+<div class="percorsi" id="percorsi"></div>
+
+<p>I moduli del percorso ridotto sono marcati <strong>NUCLEO</strong> nella mappa qui sotto. Le due cifre sono calcolate dall'indice dei moduli, non scritte a mano: se una durata cambia, cambiano con lei.</p>
+
+<div class="note errore">
+  <div class="mark">Cosa perdi<br>col percorso<br>ridotto</div>
+  <div class="body">
+    <p>Non è una versione «leggera» dello stesso corso: è un corso diverso. Salti la costruzione del modello — architettura, autograd, optimizer, i regimi di addestramento — e tieni solo la catena che porta a una diagnosi: pesi, memoria, dati, valutazione, LoRA, riproducibilità, parity, protocollo.</p>
+    <p>La conseguenza pratica: potrai <strong>escludere</strong> ipotesi e leggere quello che gli altri scrivono, ma quando una diagnosi richiederà di modificare il modello o di capire perché un optimizer si comporta così, ti mancheranno gli strumenti. A quel punto i moduli saltati sono ancora lì.</p>
+  </div>
+</div>
+
+<h2>La mappa</h2>
+
+<p>L'offset è il tempo cumulato dall'inizio, la durata è il lavoro stimato per quel modulo — lettura, esercizi e lab compresi. Sono numeri veri, servono per pianificare.</p>
+
+<div class="alloc" id="alloc"></div>
+
+<h2>Dove gira cosa</h2>
+
+<table class="hw">
+<tr><th>Macchina</th><th>Risorse</th><th>Serve da</th></tr>
+<tr>
+  <td><span class="pill cpu">CPU</span> Portatile</td>
+  <td><code>torch</code>, <code>numpy</code>, <code>safetensors</code>. Nessuna GPU</td>
+  <td><strong>M01 → M06.</strong> Tutta la Parte I e II.</td>
+</tr>
+<tr>
+  <td><span class="pill gpu">GPU</span> Nodo di addestramento</td>
+  <td>le GPU dichiarate nel profilo, NVLink</td>
+  <td><strong>Da M07.</strong> Quando il vincolo diventa la memoria.</td>
+</tr>
+<tr>
+  <td></td>
+  <td>CPU molti core, RAM abbondante, NVMe locale</td>
+  <td>M06 per l'offload, M18 per il parallelismo.</td>
+</tr>
+</table>
+
+<div class="note ponte">
+  <div class="mark">Perché si parte<br>senza GPU</div>
+  <div class="body">
+    <p>Stessa ragione per cui non si fa il debug di un Dockerfile direttamente in produzione. I concetti dei primi moduli si vedono meglio su tensori da tre elementi, che puoi stampare per intero, che su matrici 4096×4096 che non stanno in uno schermo.</p>
+    <p>La GPU serve quando il vincolo diventa la memoria — cioè da M06 in poi. Prima è solo un modo costoso di fare le stesse moltiplicazioni.</p>
+  </div>
+</div>
+
+<h2>Onestà sul risultato</h2>
+
+<p>Alla fine di questo percorso sarai autonomo nel <strong>riprodurre e adattare metodi noti</strong> usando le primitive dei framework, su un singolo nodo: prevedere la memoria prima di lanciare, progettare una valutazione che regge statisticamente, diagnosticare un fallimento per esclusione ordinata invece che per tentativi, leggere un paper di metodo e capirlo.</p>
+
+<p>Quello che questo corso <strong>non</strong> ti dà, detto senza addolcirlo:</p>
+
+<table>
+<tr><th>Fuori portata</th><th>Perché</th></tr>
+<tr><td>Diventare un ricercatore</td><td>È un altro mestiere e richiede altro. Nessun corso lo sostituisce.</td></tr>
+<tr><td>«Implementare un paper qualsiasi»</td><td>Promessa illimitata: un paper può richiedere matematica, kernel CUDA, dati o scala che qui non compaiono mai.</td></tr>
+<tr><td>L'intuizione del pretraining vero</td><td>Si forma su addestramenti da settimane su migliaia di GPU. Le formule le capirai, il giudizio no.</td></tr>
+<tr><td>I guasti da scala e durata</td><td>Divergenze dopo giorni, picchi di loss legati a un singolo shard, guasti hardware a metà run, recupero da checkpoint corrotto. Servono run lunghi e veri.</td></tr>
+<tr><td>Full fine-tuning di modelli grandi <em>in sola memoria GPU</em></td><td>Con offload su RAM abbondante e NVMe la soglia si sposta, a costo di lentezza spesso inaccettabile. Non è un muro assoluto — ma non è nemmeno gratis, e in M06 lo calcolerai.</td></tr>
+</table>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

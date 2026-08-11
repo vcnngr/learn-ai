@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M13 — Continued pretraining vs SFT</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m13">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M13 · 4 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Continued pretraining vs SFT</h1>
+<p class="subtitle">Due cose diverse che vengono confuse di continuo. Il lab addestra davvero quattro modelli e misura cosa impara ciascuno — con due risultati che smentiscono l'intuizione.</p>
+
+<p class="lede">La domanda che discrimina è una sola: <strong>il modello non <em>sa</em> una cosa, o non si <em>comporta</em> come vuoi?</strong> Sono due problemi distinti, con due soluzioni distinte, e scambiarli è uno dei modi più comuni di sprecare un mese.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Ho 12 fatti di dominio. Ne metto 8 anche in forma di domanda/risposta; 4 restano <strong>solo</strong> come testo grezzo.</p>
+    <p>Addestro un modello prima sul testo grezzo (continued pretraining), poi sulle coppie domanda/risposta (SFT).</p>
+    <ol>
+      <li>Saprà rispondere sugli <strong>8</strong> che ha visto in forma Q/R?</li>
+      <li>E sui <strong>4</strong> che ha visto solo come testo grezzo? La conoscenza acquisita nella prima fase si trasferisce al formato della seconda?</li>
+      <li>Dopo la fase SFT, quanto bene modella ancora il testo grezzo?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_13_1"><code>regime                            ppl fatti   R: visti  R: nascosti
+solo continued pretraining             1.08         0%           0%
+solo SFT                           87560.12       100%           0%
+CPT poi SFT                          694.15       100%           0%
+CPT poi SFT+replay dei fatti           1.08       100%           0%</code></pre>
+    <p><strong>1. Sì</strong>, 100%.</p>
+    <p><strong>2. No. Zero per cento</strong> — in tutti e quattro i regimi, replay compreso.</p>
+    <p><strong>3.</strong> Molto peggio: la perplessità passa da <strong>1,08</strong> a <strong>694</strong>. La fase SFT ha <em>cancellato</em> quello che la prima aveva imparato.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 13.1<br>CPT vs SFT</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_13_1_cpt_sft.py</code></pre>
+    <p>Addestra quattro transformer minuscoli con quattro regimi diversi. Gira in una decina di secondi su CPU.</p>
+  </div>
+</div>
+
+<h2>Il segnale per esempio</h2>
+
+<pre data-lab="lab_13_1"><code>regime                      token totali  supervisionati   quota
+continued pretraining                441             441    100%
+SFT (solo risposta)                  214              64     30%</code></pre>
+
+<p>Stesso corpus, stessa GPU: il continued pretraining estrae <strong>6,9 volte</strong> più segnale per esempio. Nell'SFT il 70% dei token serve solo da contesto — sono la domanda, che il modello non deve imparare a produrre.</p>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <table style="margin:0">
+      <tr><th></th><th>Continued pretraining</th><th>SFT</th></tr>
+      <tr><td><strong>Obiettivo</strong></td><td>prevedere <em>ogni</em> token</td><td>prevedere solo la <em>risposta</em></td></tr>
+      <tr><td><strong>Dati</strong></td><td>documenti grezzi</td><td>coppie istruzione/risposta con template</td></tr>
+      <tr><td><strong>Serve a</strong></td><td>assorbire conoscenza o uno stile</td><td>insegnare comportamento e formato</td></tr>
+      <tr><td><strong>Meno efficace per</strong></td><td>far seguire istruzioni, far fermare</td><td>assorbire molta conoscenza: meno token supervisionati a parità di corpus</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Primo risultato scomodo: la sequenza ingenua dimentica</h2>
+
+<pre data-lab="lab_13_1"><code>dopo il continued pretraining     ppl 1.08
+dopo la fase SFT                  ppl 694</code></pre>
+
+<p>La seconda fase ha cancellato la conoscenza della prima. È il <strong>catastrophic forgetting</strong> di M12, misurato qui in un lab che gira in dieci secondi — non un rischio teorico.</p>
+
+<p><strong>La contromisura funziona, e si vede:</strong> mescolando i fatti grezzi durante la fase SFT (<em>replay</em>), la perplessità torna a <strong>1,08</strong> — identica al continued pretraining puro — senza perdere nulla sul formato, che resta al 100%.</p>
+
+<p>Ecco perché mescolare dati di replay è pratica standard e non superstizione. Ma nota che è una contromisura da <em>verificare</em>: qui recupera tutto, altrove potrebbe recuperare in parte.</p>
+
+<h2>Secondo risultato scomodo: la conoscenza non attraversa il formato</h2>
+
+<div class="note errore">
+  <div class="mark">Zero per cento,<br>replay compreso</div>
+  <div class="body">
+    <p>Sui 4 servizi visti <strong>solo</strong> come testo grezzo, tutti e quattro i regimi rispondono correttamente lo <strong>0%</strong> delle volte.</p>
+    <p>Il modello con replay modella <code>il servizio kilo usa la porta 3096</code> con perplessità 1,08 — perfettamente — e <strong>non sa rispondere</strong> a <code>D: porta di kilo? R:</code>.</p>
+    <p>La conoscenza c'è, in forma grezza, e non è accessibile nel formato richiesto. <strong>Questo demolisce l'assunzione più comoda del modulo:</strong> che continued pretraining e SFT si compongano automaticamente. In questo esperimento non è successo.</p>
+  </div>
+</div>
+
+<div class="note nozione">
+  <div class="mark">Limiti di<br>questa misura</div>
+  <div class="body">
+    <p>Modello minuscolo, 12 fatti, poche centinaia di passi, <strong>una sola formulazione per fatto</strong>. Un modello grande, addestrato su molti modi diversi di esprimere lo stesso contenuto, può comportarsi diversamente.</p>
+    <p>Quello che questi numeri dimostrano <strong>non</strong> è «la conoscenza non si trasferisce mai». È che <strong>il trasferimento va misurato, perché può benissimo non avvenire</strong> — e chi lo dà per scontato scopre il problema alla fine, valutando.</p>
+  </div>
+</div>
+
+<p>E suggeriscono la contromisura da provare per prima: <strong>se vuoi che una conoscenza sia accessibile in un formato, mostragliela anche in quel formato.</strong> Non è un dettaglio del dataset — è il dataset.</p>
+
+<h2>Come si sceglie</h2>
+
+<pre><code>"il modello NON SA una cosa, o NON SI COMPORTA come voglio?"
+
+Non sa            -> continued pretraining
+Non si comporta   -> SFT
+Entrambi          -> CPT, poi SFT CON replay dei dati grezzi,
+                     e con la conoscenza presente ANCHE nel
+                     formato bersaglio</code></pre>
+
+<div class="note errore">
+  <div class="mark">L'errore che<br>questo modulo<br>previene</div>
+  <div class="body">
+    <p>Il modo tipico di sbagliare: si vuole insegnare <strong>conoscenza nuova</strong> e si costruisce un dataset di domande e risposte, perché è il formato che tutti usano.</p>
+    <p>Ma in SFT la maggior parte dei token non contribuisce alla loss — qui il 70% è contesto. Per far assorbire un fatto stai usando una frazione dei token che avresti con lo stesso testo in forma grezza.</p>
+    <p><strong>Sintomo osservabile:</strong> il modello impara benissimo il <em>formato</em> — risponde sempre nella forma giusta — ma il <em>contenuto</em> resta sbagliato o inventato. Nel lab è la riga «solo SFT»: 100% sul formato, e una perplessità di 87 560 sul testo di dominio.</p>
+    <div class="note errore" style="margin-top:14px;border:none;padding:0">
+      <div class="mark" style="border:none">Attenzione a<br>cosa il lab<br>NON dice</div>
+      <div class="body" style="border:none">
+        <p><strong>«L'SFT non insegna conoscenza» sarebbe falso</strong>, e lo smentisce lo stesso lab: sugli otto fatti presenti nelle coppie Q/R, l'SFT arriva al <strong>100%</strong>. Il segnale supervisionato insegna fatti eccome.</p>
+        <p>Quello che il lab mostra è più stretto: <em>a parità di corpus l'SFT supervisiona meno token</em> (qui il 30% contro il 100%), e i quattro fatti mai mostrati in forma Q/R restano allo 0%. È una questione di <strong>efficienza e di copertura del formato</strong>, non di impossibilità.</p>
+        <p>Quindi la scelta fra i due regimi è <strong>empirica</strong>: si misura quale obiettivo e quale formato rendono di più sul proprio caso, con gli strumenti di M12. Non c'è una regola che decide al posto tuo.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Il tuo modello risponde sempre nel formato giusto ma inventa i contenuti. Quale regime hai sbagliato?</li>
+  <li>Perché il continued pretraining estrae più segnale per esempio a parità di corpus?</li>
+  <li>Fai CPT e poi SFT. Quale misura devi fare fra le due fasi e dopo la seconda?</li>
+  <li>Il replay ha riportato la perplessità a 1,08. Il problema è risolto?</li>
+  <li>Vuoi che il modello risponda a domande su 5 000 documenti interni. Da dove parti?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Probabilmente stai usando l'SFT come veicolo principale di <em>conoscenza</em>, ed è inefficiente: supervisiona meno token a parità di corpus. Il continued pretraining sul testo di dominio ne estrae di più. Ma verifica prima che il problema sia davvero la conoscenza e non la copertura del formato — sono due cose diverse e il lab le separa.</p>
+    <p><strong>2.</strong> Perché supervisiona <em>ogni</em> token, mentre l'SFT esclude il prompt. Nel lab: 100% contro 30%, cioè 6,9 volte più segnale.</p>
+    <p><strong>3.</strong> La perplessità sul testo di dominio <strong>prima e dopo</strong> la fase SFT — è così che si vede il forgetting (1,08 → 694). E la capacità di rispondere su fatti visti solo in forma grezza, che è il trasferimento fra formati.</p>
+    <p><strong>4.</strong> <strong>No.</strong> Ha risolto il forgetting, non il trasferimento: i fatti visti solo come testo grezzo restano allo 0%. Due problemi distinti, due misure distinte.</p>
+    <p><strong>5.</strong> Continued pretraining sui documenti, <em>più</em> un insieme di domande e risposte costruito su quegli stessi documenti — perché il trasferimento fra formati non è automatico. E un replay durante l'SFT. Poi misuri entrambe le cose separatamente.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

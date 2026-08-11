@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M19 — MoE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m19">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M19 · 5 h · <span class="pill cpu">CPU</span><span class="pill opt">opzionale</span></p>
+<h1>MoE — Mixture of Experts</h1>
+<p class="subtitle">Modulo di specializzazione: non serve al caso di studio, che riguarda un modello denso. Sta qui perché i conti dei densi non si trasferiscono, e chi lo assume sbaglia la memoria di un fattore intero.</p>
+
+<p class="lede">La cosa da portare via è una sola e cambia tutti i conti precedenti: <strong>un MoE ha due conteggi di parametri</strong>, e servono a due domande diverse. Confonderli produce previsioni di memoria sbagliate di 4× o 32×.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un modello descritto come «8 esperti, top-2»: ogni token passa per 2 esperti su 8.</p>
+    <ol>
+      <li>Per l'aritmetica di memoria di M06, quale numero di parametri usi: quelli totali o quelli attivi per token?</li>
+      <li>Il MoE fa risparmiare memoria, calcolo, o entrambi?</li>
+      <li>Il termine di bilanciamento del carico è gratis?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_19_1"><code>configurazione             par. MLP TOTALI   ATTIVI/token   rapporto
+denso                                5.6 G          5.6 G       1.0x
+MoE  8 esperti, top-2               45.1 G         11.3 G       4.0x
+MoE 64 esperti, top-2              360.8 G         11.3 G      32.0x</code></pre>
+    <p><strong>1. I TOTALI.</strong> Tutti gli esperti stanno in memoria, anche quelli che questo token non usa.</p>
+    <p><strong>2. Solo calcolo.</strong> Il risparmio del MoE è sui FLOP per token, non sui byte. Un modello «8×7B» non è un 56B: ha ~56B da tenere in memoria e ~13B di calcolo per token.</p>
+    <p><strong>3. No</strong>, e il lab lo misura: sulla configurazione già bilanciata <strong>peggiora l'MSE di 6 volte</strong>.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 19.1<br>MoE</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_19_1_moe.py</code></pre>
+    <p>Un router vero, addestrato in quattro configurazioni.</p>
+  </div>
+</div>
+
+<h2>Il router non ha semantica</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Il router è <strong>uno strato lineare</strong> da <code>hidden</code> a <code>n_esperti</code>, seguito da softmax e da un top-k. Nient'altro.</p>
+    <p>Non c'è assegnazione per argomento, non c'è un esperto «di matematica» e uno «di codice»: è un classificatore che impara insieme al resto, e le sue scelte non hanno un'interpretazione garantita.</p>
+  </div>
+</div>
+
+<h2>Il bilanciamento: misurato in entrambe le direzioni</h2>
+
+<pre data-lab="lab_19_1"><code>scenario                         assegn. top   % token   entropia        MSE
+routing libero                         16.0%     31.9%      2.064     0.0032
++ termine di bilanciamento             13.5%     27.1%      2.078     0.0191
+router SBILANCIATO a forza             50.0%    100.0%      1.652     0.0098
+sbilanciato + bilanciamento            15.5%     31.0%      2.076     0.0058</code></pre>
+
+<div class="note errore">
+  <div class="mark">Le due colonne<br>non dicono<br>la stessa cosa</div>
+  <div class="body">
+    <p>Con <strong>top-2</strong> ogni token produce <em>due</em> assegnazioni, quindi il totale su cui si normalizza è <code>2N</code>, non <code>N</code>. La prima colonna è la <strong>quota delle assegnazioni</strong>: le otto quote sommano a 1. La seconda è la <strong>frazione di token</strong> che si trovano quell'esperto fra i due scelti: le otto frazioni sommano a 2.</p>
+    <p>La terza riga mostra perché la distinzione non è pedanteria: <strong>50% delle assegnazioni è il 100% dei token</strong>. Ogni singolo token passa da quell'esperto. Chiamare «50% dei token» quella riga avrebbe fatto sembrare metà del traffico un problema che invece riguardava tutto.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Onestà su<br>cosa NON<br>è successo</div>
+  <div class="body">
+    <p><strong>In questo giocattolo il router non collassa da solo.</strong> Con ingressi isotropi e nessuna struttura da specializzare, gli esperti restano bilanciati anche senza aiuto: 16% al più usato, entropia 2,064 su un massimo di 2,079.</p>
+    <p>Non l'ho forzato fingendo che fosse spontaneo. Nella terza riga lo <strong>impongo</strong> con un bias nel router, per mostrare che aspetto hanno le metriche quando succede davvero.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Quattro scenari,<br>non quattro<br>misure</div>
+  <div class="body">
+    <p>Prima di leggere i numeri, il limite che li governa. Le quattro righe sono <strong>scenari costruiti</strong>, non condizioni abbinate. La terza non è «il router che collassa»: è un router a cui ho imposto <code>forza=8.0</code> sui logit e che ho poi <em>riaddestrato</em>. Fra la prima riga e la terza non cambia solo il bilanciamento — cambia il problema di ottimizzazione, e con esso la traiettoria. Un solo seme per riga, nessun intervallo.</p>
+    <p>Quindi la tabella mostra <strong>che aspetto hanno le metriche</strong> nei quattro casi. Non isola lo sbilanciamento come causa, e non stima quanto costi. Per una conclusione causale servirebbero condizioni abbinate, più semi e intervalli: è esattamente il protocollo di M12, ed è quello che qui <em>non</em> ho fatto.</p>
+  </div>
+</div>
+
+<p>Con quel limite in mente, tre cose si leggono:</p>
+
+<ol>
+  <li><strong>Sbilanciamento e MSE peggiore compaiono insieme.</strong> Nello scenario forzato l'esperto più usato prende il 50% delle assegnazioni — il 100% dei token — e l'MSE va da <code>0,0032</code> a <code>0,0098</code>: 3,1 volte peggio. Paghi la memoria di 8 esperti e ne sfrutti l'equivalente di 5,2 (è <code>e^entropia</code>).</li>
+  <li><strong>Il bilanciamento recupera</strong>, quando c'è qualcosa da recuperare: entropia da 1,652 a 2,076, MSE da <code>0,0098</code> a <code>0,0058</code>.</li>
+  <li><strong>Ma non è gratis.</strong> Sulla riga già bilanciata <em>peggiora</em> l'MSE da <code>0,0032</code> a <code>0,0191</code> — <strong>6 volte</strong> — per bilanciare qualcosa che era già bilanciato. Anche questo è un singolo run: dice che il termine ausiliario <em>può</em> costare, non che costi sempre 6 volte.</li>
+</ol>
+
+<p>Il termine ausiliario <strong>compete con la loss principale</strong>, e il suo coefficiente è un iperparametro con un costo da misurare — nel tuo caso, con più di un seme. Non si attiva «per sicurezza»: è la stessa logica di ZeRO-3 in M18.</p>
+
+<h3>Metriche da registrare</h3>
+
+<ul>
+  <li><strong>Quota delle assegnazioni top-k per esperto</strong> — la distribuzione, non la media. Attenzione al denominatore: somma su <code>k·N</code>, non su <code>N</code>.</li>
+  <li><strong>Frazione di token che seleziona ciascun esperto</strong> — l'altra metà della storia: le quote sommano a <code>k</code>, e sono queste a dirti quanto traffico tocca davvero un esperto.</li>
+  <li><strong>Entropia del routing</strong>, confrontata col suo massimo <code>log(N)</code>. <code>e^entropia</code> è il numero di esperti «effettivamente» in uso.</li>
+  <li><strong>Token scartati per capacità</strong>, dove il meccanismo esiste.</li>
+</ul>
+
+<h2>Perché il fine-tuning si comporta diversamente</h2>
+
+<table>
+<tr><th>Fenomeno</th><th>Conseguenza</th></tr>
+<tr><td><strong>Gradiente sparso</strong></td><td>Ogni token aggiorna solo gli esperti che ha scelto. Con un dataset di fine-tuning piccolo e specialistico, molti esperti non ricevono quasi gradiente: restano al pretraining mentre pochi si spostano molto.</td></tr>
+<tr><td><strong>Il router può spostarsi</strong></td><td>Se il fine-tuning cambia la distribuzione degli ingressi, il router cambia le sue scelte e porta token verso esperti non addestrati per loro. È una fonte di regressione che nei densi <em>non esiste</em>.</td></tr>
+<tr><td><strong>Le quote di M04 non valgono</strong></td><td>La quota dell'MLP esplode, moltiplicata per il numero di esperti. Un LoRA sui soli target di attention tocca una frazione ancora più piccola del modello (M14).</td></tr>
+<tr><td><strong>Il conto di M06 cambia</strong></td><td>La voce PESI segue i parametri <em>totali</em>. Farlo sugli «attivi» sottostima la memoria del rapporto della prima tabella: 4× o 32×.</td></tr>
+</table>
+
+<h2>Cosa questo modulo non dimostra</h2>
+
+<div class="note errore">
+  <div class="mark">Limiti<br>dichiarati</div>
+  <div class="body">
+    <p>Modello minuscolo, dati sintetici, esperti giocattolo. Il meccanismo e le metriche sono quelli giusti, ma:</p>
+    <ul>
+      <li>la soglia a cui un MoE vero si sbilancia dipende da scala, dati e coefficiente del termine ausiliario;</li>
+      <li>il coefficiente <code>0,5</code> usato qui <strong>non è un valore consigliato</strong>: è quello che rende visibile l'effetto in questo giocattolo;</li>
+      <li>esistono varianti di routing e di bilanciamento diverse da questa, e alcune non usano affatto un termine ausiliario.</li>
+    </ul>
+    <p>Quello che si porta via: <strong>quali metriche guardare</strong>, e che lo sbilanciamento non produce errori — solo capacità sprecata e qualità peggiore. Il resto va misurato sul modello vero, con M12.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Un «8×7B»: quanti parametri metti nella voce PESI del conto di M06?</li>
+  <li>L'entropia del routing è 1,652 su un massimo di 2,079. Quanti esperti stai davvero sfruttando?</li>
+  <li>Il tuo MoE è già bilanciato. Conviene alzare il coefficiente del termine ausiliario?</li>
+  <li>Perché un fine-tuning specialistico può lasciare metà degli esperti al valore del pretraining?</li>
+  <li>Il tuo LoRA su un MoE tocca <code>q_proj</code> e <code>v_proj</code>. Rispetto a un denso, la frazione di modello toccata è maggiore o minore?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> I <strong>totali</strong> — circa 56B, non 13B. Usare gli attivi sottostima la memoria di 4×.</p>
+    <p><strong>2.</strong> <code>e^1,652 ≈ 5,2</code> esperti su 8. Paghi la memoria di 8 e ne sfrutti poco più di cinque.</p>
+    <p><strong>3. No.</strong> Nel lab, il termine di bilanciamento su una configurazione già bilanciata peggiora l'MSE di 6 volte. Compete con la loss principale.</p>
+    <p><strong>4.</strong> Perché il gradiente è <strong>sparso</strong>: ogni token aggiorna solo gli esperti che ha scelto. Se il dataset è ristretto, il router seleziona sempre gli stessi e gli altri non ricevono segnale.</p>
+    <p><strong>5. Minore.</strong> La quota dell'MLP è moltiplicata per il numero di esperti, quindi l'attention pesa relativamente molto meno. È l'asimmetria di M14, amplificata.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

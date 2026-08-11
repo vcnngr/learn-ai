@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M10 — Tokenizer e chat template</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m10">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M10 · 6 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Tokenizer e chat template</h1>
+<p class="subtitle">Il modulo che tocca direttamente il LoRA del caso di studio. Due delle cause più frequenti di un fine-tuning deludente vivono qui, e si escludono in un pomeriggio.</p>
+
+<p class="lede">Il tokenizer è l'unico pezzo del sistema che sta <em>fuori</em> dal modello e può romperlo completamente. E lo fa in silenzio: nessun errore, loss che scende regolarmente, risultati mediocri.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Hai addestrato un LoRA usando questo formato:</p>
+    <pre style="margin:10px 0"><code>### user:
+Ciao
+### assistant:
+Salve.</code></pre>
+    <p>Il modello base però era stato addestrato con <code>&lt;|im_start|&gt;user\nCiao&lt;|im_end|&gt;</code>.</p>
+    <ol>
+      <li>L'addestramento darà un errore?</li>
+      <li>La loss scenderà?</li>
+      <li>Cosa avrà imparato il modello, esattamente?</li>
+      <li>Come te ne accorgi, se non c'è nessun errore?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1. No.</strong> La stringa è valida, la tokenizzazione riesce, l'addestramento parte.</p>
+    <p><strong>2. Sì</strong>, regolarmente. Il modello sta imparando qualcosa: solo, non quello che volevi.</p>
+    <p><strong>3.</strong> Ha imparato a completare testo nel formato <code>###</code> — un formato che non ha mai visto nel pretraining. E soprattutto: nel formato corretto i confini fra i turni sono <strong>un singolo token dedicato</strong>, imparato durante il pretraining, che il modello riconosce come «qui finisce un turno». Con <code>###</code> quel segnale <em>non esiste</em>: sono tre caratteri di testo ordinario.</p>
+    <p>Misurato nel lab: il template corretto usa <strong>6 token speciali</strong>, quello markdown <strong>0</strong>. E le due sequenze condividono <strong>0 posizioni</strong> iniziali uguali.</p>
+    <p><strong>4.</strong> Non dai log dell'addestramento — lì tutto sembra normale. Te ne accorgi solo confrontando il testo renderizzato con quello del modello base, oppure valutando il modello e trovandolo mediocre senza sapere perché. È esattamente la situazione da cui sei partito.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 10.1<br>tokenizer</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_10_1_tokenizer.py</code></pre>
+    <p>BPE addestrato da zero in ~40 righe di Python puro, nessuna libreria di tokenizzazione.</p>
+  </div>
+</div>
+
+<h2>BPE: l'algoritmo per intero</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <ol style="margin-bottom:8px">
+      <li>Parti dai singoli byte: 256 simboli, coprono qualunque testo.</li>
+      <li>Conta le coppie adiacenti più frequenti nel corpus.</li>
+      <li>Fondi la coppia più frequente in un simbolo nuovo.</li>
+      <li>Ripeti finché il vocabolario ha la dimensione voluta.</li>
+    </ol>
+    <p>Nient'altro. <strong>Non c'è linguistica: solo conteggi di frequenza.</strong></p>
+  </div>
+</div>
+
+<p>Addestrato su un corpus giocattolo di 40 parole, le prime fusioni sono:</p>
+
+<pre data-lab="lab_10_1"><code>Vocabolario: 256 byte + '_' + 14 fusioni = 271 simboli
+
+  #  coppia fusa          occorrenze  simbolo nato
+  1  l + _                        14  'l</w>'
+  2  i + l</w>                    11  'il</w>'
+  5  a + n                         7  'an'
+  8  g + a                         5  'ga'
+  9  ga + t                        5  'gat'
+ 10  gat + to</w>                  4  'gatto</w>'</code></pre>
+
+<p>La parola più frequente del corpus, <code>il</code>, diventa un token dopo due fusioni. <code>gatto</code> ne richiede quattro.</p>
+
+<p><strong>Conseguenza:</strong> un tokenizer addestrato su italiano fonde cose diverse da uno addestrato su codice. Non sono intercambiabili fra modelli, e non è una questione di compatibilità formale — sono <em>alfabeti diversi</em>.</p>
+
+<h3>Nessuna parola è fuori vocabolario</h3>
+
+<pre data-lab="lab_10_1"><code>testo            segmentazione                              token
+gatto            gatto</w>                                      1
+cane             c | an | e</w>                                 3
+gattopardo       gat | t | o | p | a | r | d | o</w>            8
+perché           p | e | r | c | h | &lt;c3&gt; | &lt;a9&gt; | _            8
+日本語             &lt;e6&gt;|&lt;97&gt;|&lt;a5&gt;|&lt;e6&gt;|&lt;9c&gt;|&lt;ac&gt;|&lt;e8&gt;|&lt;aa&gt;|&lt;9e&gt;|_    10
+🐈                &lt;f0&gt; | &lt;9f&gt; | &lt;90&gt; | &lt;88&gt; | _                  5
+
+Simboli prodotti che NON stanno nel vocabolario: 0</code></pre>
+
+<p><strong>Zero, e non per fortuna:</strong> ogni parola si scompone al peggio nei suoi <em>byte</em>, e tutti i 256 byte sono nel vocabolario per costruzione. Nessun testo può essere «fuori vocabolario» — vale per l'italiano accentato, per il giapponese, per le emoji, per dati binari.</p>
+
+<p>Guarda però il <strong>costo</strong>: un carattere accentato occupa 2 byte in UTF-8, un ideogramma 3, un'emoji 4. Se nessuna fusione li copre, paghi <strong>un token per byte</strong>. <code>日本語</code> — tre caratteri — costa 10 token.</p>
+
+<div class="note errore">
+  <div class="mark">Il costo<br>nascosto</div>
+  <div class="body">
+    <p><code>gatto</code> costa 1 token, <code>gattopardo</code> ne costa 8 — pur condividendo i primi cinque caratteri. La fusione <code>gatto</w></code> richiede il marcatore di fine parola, che in <code>gattopardo</code> non c'è: non si applica, e la parola si sbriciola.</p>
+    <p><strong>Le fusioni imparate valgono in un contesto preciso.</strong> Un carattere attaccato in più, uno spazio in meno, una virgola: la segmentazione può cambiare completamente anche se il testo a occhio è quasi identico.</p>
+    <p>Nei tokenizer reali lo spazio iniziale fa parte del token — <code>"gatto"</code> e <code>" gatto"</code> sono due token diversi. Verificalo in dieci secondi sul tuo:</p>
+    <pre style="margin:10px 0"><code>print(tokenizer.encode("gatto"), tokenizer.encode(" gatto"))</code></pre>
+    <p>Se gli id differiscono — e differiranno — allora uno spazio in più o in meno nel tuo template produce una sequenza diversa da quella vista in addestramento.</p>
+  </div>
+</div>
+
+<p>C'è anche una conseguenza economica diretta: un dominio lontano dal corpus del tokenizer consuma <strong>più contesto a parità di testo</strong>. Se addestri su un gergo tecnico, sigle o un'altra lingua, i tuoi esempi occupano più token del previsto — e la lunghezza di sequenza che avevi scelto potrebbe troncarli.</p>
+
+<h2>Il chat template</h2>
+
+<p>Stessi tre messaggi, tre template diversi:</p>
+
+<pre data-lab="lab_10_1"><code>A  '<|im_start|>system\nSei conciso.<|im_end|>\n<|im_start|>user\nCiao...'    113 car.
+B  '<|start_header_id|>system<|end_header_id|>\n\nSei conciso.<|eot_id|>...'  185 car.
+C  '### system:\nSei conciso.\n### user:\nCiao\n### assistant:\nSalve.\n'      62 car.</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p><strong>Il template non è formattazione: è la sintassi che il modello ha imparato a riconoscere.</strong> I marcatori di turno sono token <em>speciali</em>, singoli, presenti nel vocabolario e visti milioni di volte durante il pretraining.</p>
+    <p>Usare un template diverso da quello dell'addestramento significa parlargli in una lingua che non ha mai visto — senza che niente segnali il problema.</p>
+  </div>
+</div>
+
+<h2>Il danno, misurato</h2>
+
+<pre data-lab="lab_10_1"><code>template A ->  53 token   primi 8: [1000, 115, 121, 115, 116, 101, 109, 10]
+template B ->  56 token   primi 8: [1002, 115, 121, 115, 116, 101, 109, 1003]
+template C ->  62 token   primi 8: [35, 35, 35, 32, 115, 121, 115, 116]
+
+A e C condividono 0/53 posizioni iniziali uguali
+A usa 6 token speciali, C ne usa 0</code></pre>
+
+<p>Il template markdown non usa <strong>nessun</strong> token speciale: i <code>###</code> sono testo ordinario, scomposto in caratteri (<code>35, 35, 35</code>). Per un modello addestrato col template A, questo è testo senza struttura — i confini fra i turni semplicemente non ci sono.</p>
+
+<p>E tutto questo <strong>senza un solo errore</strong>. La stringa è valida, la tokenizzazione riesce, l'addestramento parte, la loss scende. Il modello impara — impara qualcosa di diverso da quello che volevi.</p>
+
+<h2>Loss masking</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Non vuoi che il modello impari a riprodurre le <em>domande</em>: vuoi che impari a produrre le <em>risposte</em>. Le posizioni del prompt vengono escluse dalla loss marcandole con un valore convenzionale — di solito <code>-100</code> — che la funzione di loss ignora.</p>
+  </div>
+</div>
+
+<pre data-lab="lab_10_1"><code>sequenza totale: 53 token
+  prompt   45 token
+  risposta  8 token
+
+solo risposta (corretto)   posizioni che contribuiscono:   8/53  (15%)
+tutto (sbagliato)          posizioni che contribuiscono:  53/53  (100%)</code></pre>
+
+<p>Nel caso corretto solo il <strong>15%</strong> delle posizioni contribuisce. Addestrando su tutto, il modello spende l'85% dello sforzo a imparare a riprodurre i prompt.</p>
+
+<div class="note errore">
+  <div class="mark">Contare<br>non basta</div>
+  <div class="body">
+    <p>Due maschere possono avere lo <strong>stesso conteggio</strong> e coprire posizioni <strong>diverse</strong>. Il caso peggiore è lo sfasamento di una posizione: il totale resta identico e ogni token viene allineato al bersaglio sbagliato.</p>
+    <p>Si confronta <strong>elemento per elemento</strong>, non con un totale.</p>
+  </div>
+</div>
+
+<h2>Il controllo che devi fare sul LoRA del caso di studio</h2>
+
+<p>Cinque righe, e chiudono due delle ipotesi più probabili:</p>
+
+<pre><code>for tok_id, etichetta in zip(input_ids[0], labels[0]):
+    segno = "  " if etichetta == -100 else "->"
+    print(segno, repr(tokenizer.decode([tok_id])))</code></pre>
+
+<p>Le righe con <code>-&gt;</code> sono quelle su cui il modello viene addestrato. <strong>Guardale una per una.</strong></p>
+
+<ul>
+  <li>Ci trovi il <strong>prompt</strong>? La maschera è sbagliata.</li>
+  <li>Ci trovi l'<strong>intestazione</strong> che apre il turno assistant? Idem: è prompt, non risposta.</li>
+  <li>La risposta comincia <strong>una posizione dopo</strong> dove ti aspetti? Sfasamento.</li>
+  <li>I marcatori di turno appaiono come <strong>più token</strong> invece che uno solo? Template sbagliato: non stai usando i token speciali del modello.</li>
+  <li><strong>Non</strong> ci trovi il token di fine turno? Questo è il problema opposto — vedi sotto.</li>
+</ul>
+
+<div class="note errore">
+  <div class="mark">Non tutti i<br>token speciali<br>vanno mascherati</div>
+  <div class="body">
+    <p>«Trovo token di struttura fra quelli attivi» non è di per sé un errore: <strong>dipende da quali</strong>.</p>
+    <table style="margin:10px 0">
+      <tr><th>Token</th><th>Va</th><th>Perché</th></tr>
+      <tr><td><strong>Prefisso</strong> di struttura — l'intestazione che apre il turno assistant</td><td><strong>mascherato</strong></td><td>È parte del prompt: il modello lo riceve, non deve produrlo.</td></tr>
+      <tr><td><strong>Terminatore</strong> di fine turno / EOS</td><td><strong>supervisionato</strong></td><td>È il token con cui il modello impara a <em>fermarsi</em>.</td></tr>
+    </table>
+    <p><strong>Se maschera il terminatore, il modello non impara mai a smettere di generare</strong> — e in inferenza continua a produrre testo oltre la risposta, spesso inventando un turno successivo. È un guasto frequente e ha un sintomo riconoscibile: risposte corrette che non finiscono.</p>
+    <p>Nel lab lo vedi esplicitamente: dentro la risposta supervisionata c'è <code>&lt;|im_end|&gt;</code>, ed è corretto che ci sia.</p>
+  </div>
+</div>
+
+<p>E in parallelo, il confronto del testo renderizzato:</p>
+
+<pre><code>print(repr(tokenizer.apply_chat_template(messaggi, tokenize=False)))
+print(repr(il_tuo_testo_di_addestramento))</code></pre>
+
+<p>Devono coincidere <strong>carattere per carattere</strong>. Uno spazio o un a capo di differenza bastano a cambiare gli id. Ricorda però l'ordine di M02: <em>prima</em> verifichi che l'input strutturato sia identico, <em>poi</em> confronti il testo, <em>poi</em> gli id. Saltare un passo attribuisce la colpa allo stadio sbagliato.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Perché un tokenizer addestrato su inglese produce più token su testo italiano?</li>
+  <li>Il tuo dataset usa <code>### user:</code> e il modello base usa <code>&lt;|im_start|&gt;user</code>. L'addestramento fallisce?</li>
+  <li>Due maschere hanno entrambe 340 posizioni attive su 1024. Sono equivalenti?</li>
+  <li>Cosa cambia fra <code>encode("Ciao")</code> e <code>encode(" Ciao")</code>, e perché ti riguarda?</li>
+  <li>Hai messo la maschera correttamente ma la loss al primo passo è quasi zero. Cosa controlli?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Le fusioni sono state imparate sulle frequenze dell'inglese. Le sequenze comuni in italiano non sono state fuse, quindi si scompongono in più pezzi. Stesso testo, più token, più contesto consumato, più costo.</p>
+    <p><strong>2.</strong> <strong>No, non fallisce.</strong> Parte, la loss scende, e il modello impara un formato che il base non conosce — perdendo per strada i token speciali di turno. Nessun errore, risultato mediocre.</p>
+    <p><strong>3.</strong> <strong>Non necessariamente.</strong> Stesso conteggio, posizioni potenzialmente diverse. Vanno confrontate elemento per elemento: uno sfasamento di una posizione lascia il totale identico e rovina l'allineamento.</p>
+    <p><strong>4.</strong> Nei tokenizer byte-level lo spazio fa parte del token, quindi gli id differiscono. Ti riguarda perché uno spazio in più o in meno nel template produce una sequenza diversa da quella vista in pretraining — e a occhio il testo sembra identico.</p>
+    <p><strong>5.</strong> Che la maschera non stia coprendo la risposta <em>invece</em> del prompt (invertita), e che gli esempi di valutazione non siano finiti nell'addestramento. Ricorda però il limite di M02: se stai facendo fine-tuning di un modello preaddestrato, «quasi zero» va confrontato con la baseline del modello base sugli stessi dati, non con <code>log(V)</code>.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

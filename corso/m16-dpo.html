@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M16 — Preferenze: DPO e ORPO</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m16">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M16 · 6,5 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Preferenze: DPO e ORPO</h1>
+<p class="subtitle">Quando non sai scrivere la risposta giusta ma sai riconoscere quale delle due è migliore. E il modo spettacolare in cui tutti gli indicatori possono mentire insieme.</p>
+
+<p class="lede">Questo modulo contiene la dimostrazione più utile del corso su «la loss non è la qualità»: un addestramento con <strong>loss 0,004, margine +62 e accuratezza 100%</strong> in cui le risposte <em>preferite</em> sono diventate meno probabili di prima.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>DPO ottimizza questa quantità, dove <code>r</code> è la differenza di log-probabilità fra il modello e un riferimento congelato:</p>
+    <pre style="margin:10px 0"><code>L = −log σ( β · ( r(preferita) − r(rifiutata) ) )</code></pre>
+    <ol>
+      <li>Se l'addestramento funziona e il margine sale, la probabilità della risposta <strong>preferita</strong> deve salire?</li>
+      <li>Guarda bene la formula prima di rispondere: cosa impone esattamente?</li>
+      <li>Quanti modelli devi tenere in memoria durante un DPO?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_16_1"><code> passo   loss DPO   margine  accuratezza   logp PREFERITA   logp rifiutata
+     0     0.6931     0.000           0%           -0.028          -56.335
+   100     0.0178    46.377         100%           -0.130         -102.814
+   300     0.0040    61.983         100%           -0.210         -118.501</code></pre>
+    <p><strong>1. No.</strong> Nel lab la log-probabilità della preferita <strong>scende</strong>: da −0,028 a −0,210.</p>
+    <p><strong>2.</strong> La formula impone solo che la <em>differenza</em> cresca. Abbassare molto la rifiutata (−56,335 → −118,501) e poco la preferita soddisfa l'obiettivo <strong>esattamente quanto</strong> alzare la preferita.</p>
+    <p><strong>3. Due:</strong> quello che addestri e il riferimento congelato. Il conto di M06 va rifatto con entrambi.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Loss 0,004 · margine +62 · accuratezza 100%. <strong>Tutti e tre gli indicatori dicono «perfetto»</strong> mentre le risposte che volevi rendere più probabili diventano meno probabili.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 16.1<br>DPO</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_16_1_dpo.py</code></pre>
+  </div>
+</div>
+
+<h2>I dati sono coppie</h2>
+
+<pre data-lab="lab_16_1"><code>prompt             PREFERITA  RIFIUTATA
+porta di alfa?     2000       non lo so
+porta di beta?     2137       boh
+porta di gamma?    2274       forse 80</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>In SFT ogni esempio ha <strong>una</strong> risposta giusta. Qui ogni esempio ha una <strong>coppia</strong>: il segnale non è «produci questo» ma «preferisci questo <em>a quello</em>».</p>
+    <p>Serve quando la qualità è relativa e non sai scrivere la risposta ideale: tono, concisione, sapersi rifiutare quando non si conosce la risposta. <strong>Se sai già scrivere la risposta giusta, l'SFT è più diretto</strong> — segnale più forte, niente modello di riferimento, metà della memoria.</p>
+  </div>
+</div>
+
+<h2>La formula, e cosa non impone</h2>
+
+<pre><code>r(x,y) = log π(y|x) − log π_rif(y|x)          "reward implicito"
+
+L = −log σ( β · ( r(x, preferita) − r(x, rifiutata) ) )</code></pre>
+
+<p>Tre conseguenze che si leggono direttamente dalla formula:</p>
+
+<ol>
+  <li><strong>Serve una politica di riferimento congelata</strong> oltre a quella che addestri: la loss ha bisogno dei <em>log-rapporti</em> rispetto a <code>π_rif</code>. Quanto costa in memoria è però una scelta di implementazione, non una conseguenza della formula. Il lab tiene due copie residenti, ed è il caso peggiore da cui conviene partire per il conto di M06; ma su un dataset fisso le log-probabilità del riferimento si possono <strong>precalcolare una volta</strong>, e con gli adattatori si può condividere la base spegnendo l'adattatore per ottenere il riferimento. Verifica cosa fa la tua libreria, alla tua versione, invece di assumere due modelli in memoria.</li>
+  <li><strong>La loss dipende solo dalla differenza.</strong> Il gradiente spinge la preferita verso l'alto, ma la formula è soddisfatta anche se scende — purché la rifiutata scenda di più.</li>
+  <li><strong><code>β</code> controlla quanto puoi allontanarti dal riferimento.</strong> Piccolo = libertà, grande = ancoraggio.</li>
+</ol>
+
+<h2>Il risultato che sorprende</h2>
+
+<pre data-lab="lab_16_1"><code>grandezza                        inizio       fine   variazione
+margine (ciò che ottimizzi)       0.000     61.983      +61.983
+logp della PREFERITA             -0.028     -0.210       -0.182
+logp della rifiutata            -56.335   -118.501      -62.165</code></pre>
+
+<div class="note errore">
+  <div class="mark">Perché<br>succede</div>
+  <div class="body">
+    <p>La spiegazione facile — «nulla spinge la preferita verso l'alto» — <strong>è sbagliata</strong>, e vale la pena vedere perché, perché il meccanismo vero è più interessante.</p>
+    <p>Deriviamo. Ponendo <code>z = β[(log π_w − log π_ref,w) − (log π_l − log π_ref,l)]</code>:</p>
+    <pre style="margin:10px 0"><code>∂L/∂(log π_preferita) = −β·σ(−z)  &lt; 0     spinge in ALTO
+∂L/∂(log π_rifiutata) = +β·σ(−z)  &gt; 0     spinge in BASSO</code></pre>
+    <p>Il segnale locale sulla preferita è <strong>verso l'alto</strong>, non nullo. Eppure la sua log-probabilità scende. La contraddizione è solo apparente, e si scioglie notando che quelle due quantità <strong>non sono variabili indipendenti</strong>:</p>
+    <ul>
+      <li>L'aggiornamento avviene nello spazio dei <strong>parametri</strong>, che sono condivisi fra tutte le sequenze. Un passo che abbassa molto la rifiutata muove pesi che servono anche alla preferita.</li>
+      <li>Le probabilità sono <strong>normalizzate</strong>: la massa che la rifiutata perde non va necessariamente alla preferita. Va dove capita — su altre continuazioni, che nessuno sta guardando.</li>
+    </ul>
+    <p>Quindi la formulazione corretta è: <strong>l'obiettivo spinge la preferita verso l'alto, ma non garantisce nulla sull'esito assoluto dopo l'aggiornamento.</strong> È la differenza fra un gradiente e il suo effetto attraverso parametri condivisi.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Perché proprio<br>quella direzione</div>
+  <div class="body">
+    <p>Resta una domanda che l'analisi della formula non chiude: se il segnale sulla preferita punta in alto, <em>perché</em> l'ottimizzazione sceglie di far scendere entrambe? Due fatti stanno già nei numeri stampati sopra.</p>
+    <p><strong>1. Lo spazio disponibile è asimmetrico.</strong> La preferita parte da <code>logp = −0,028</code>, cioè probabilità <code>0,972</code>: è quasi satura, e salendo può guadagnare al massimo 0,028 nat. La rifiutata parte da <code>−56,335</code> e ha decine di nat da perdere. Il margine si allarga di 62 punti, e praticamente tutto quel guadagno può venire solo da un lato. «Giù entrambe» è la direzione a minor resistenza perché è l'unica con spazio.</p>
+    <p><strong>2. Il peso che alzerebbe la preferita si spegne.</strong> Entrambe le derivate hanno per fattore <code>σ(−z)</code>, con <code>z = β·margine</code> e <code>β = 0,1</code>. All'inizio, margine 0, vale <code>0,50</code>. Alla fine, margine 61,98, vale <code>0,0020</code>: <strong>250 volte più piccolo</strong>. La spinta verso l'alto non cambia mai segno — svanisce. Appena il margine cresce, l'obiettivo smette di avere opinioni su dove stia la preferita in assoluto.</p>
+    <p>Messi insieme: una spinta corretta ma sempre più debole, su una quantità che ha quasi zero spazio per salire, mentre i parametri condivisi si muovono per far crollare l'altra. Ecco perché il campanello da guardare è <code>logp(preferita)</code> in valore assoluto, e non il margine.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Cosa il lab<br>NON dimostra</div>
+  <div class="body">
+    <p>Sarebbe comodo concludere «quindi il modello genera peggio». <strong>Questo lab non lo mostra</strong>, e affermarlo sarebbe l'errore che il corso insegna a evitare.</p>
+    <p>Il lab misura la log-probabilità di <em>otto stringhe precise</em>: quattro preferite e quattro rifiutate. Non genera testo, non valuta la qualità su un insieme tenuto da parte, non guarda lunghezze né terminatori.</p>
+    <p>E c'è un argomento che chiude la questione: una distribuzione è <strong>normalizzata</strong>, quindi non può diventare «meno propensa a produrre qualunque cosa». La massa si sposta, non sparisce. Dove sia andata, qui, non è misurato.</p>
+    <p><strong>La conclusione onesta è più stretta e resta preoccupante:</strong> le quattro risposte preferite sono diventate meno probabili mentre tutte le metriche di DPO miglioravano. Per dire qualcosa sulla qualità serve una misura indipendente — M12.</p>
+  </div>
+</div>
+
+<h2>Il gradiente diretto contro l'aggiornamento parametrico</h2>
+
+<p>Fin qui hai letto un ragionamento. La sezione 4b del lab lo rende <strong>eseguibile</strong>, in due parti che sembrano contraddirsi.</p>
+
+<h3>Parte A — le due log-probabilità come variabili indipendenti</h3>
+
+<pre data-lab="lab_16_1"><code>grandezza                                valore
+z = beta * margine                     0.000000
+sigma(-z)  (il PESO del gradiente)     0.500000
+dL/dlogp(PREFERITA)                   -0.050000   &lt;- NEGATIVO
+dL/dlogp(rifiutata)                    0.050000   &lt;- POSITIVO</code></pre>
+
+<p>Le due log-probabilità vengono trattate come scalari slegati, e autograd conferma i segni previsti dalla formula: <strong>la discesa del gradiente spinge la preferita in alto.</strong> Il segnale locale c'è, ed è nel verso che ti aspetti.</p>
+
+<h3>Parte B — le stesse quantità sul modello vero</h3>
+
+<pre data-lab="lab_16_1"><code>                              prima   dopo 1 passo   variazione
+logp PREFERITA              -0.0280        -0.0276      +0.0004
+logp rifiutata             -56.3354       -58.0794      -1.7440
+margine                      0.0000         1.7445      +1.7445</code></pre>
+
+<div class="note errore">
+  <div class="mark">Un passo dice<br>una cosa,<br>trecento<br>l'opposto</div>
+  <div class="body">
+    <p>Al <strong>primo</strong> passo la preferita <em>sale</em>: l'aggiornamento segue il segnale locale della parte A. Chi si fermasse qui concluderebbe che tutto torna.</p>
+    <pre style="margin:10px 0" data-lab="lab_16_1"><code>orizzonte                   variazione di logp(preferita)
+1 passo (qui sopra)                               +0.0004
+300 passi (sezione 4)                             -0.1823</code></pre>
+    <p>Il segnale locale è corretto <em>e all'inizio viene pure seguito</em>. Poi perde, per due motivi che si sommano:</p>
+    <ol>
+      <li>il peso <code>σ(−z)</code> <strong>crolla</strong> appena il margine cresce — da 0,50 a 0,0020 — quindi la spinta verso l'alto si spegne mentre l'ottimizzazione continua;</li>
+      <li>i parametri sono <strong>condivisi</strong>: i passi che continuano ad abbassare la rifiutata muovono pesi che servono anche alla preferita, e il softmax ridistribuisce la massa fra <em>tutte</em> le continuazioni.</li>
+    </ol>
+    <p>Quello che osservi non è il gradiente: è la sua <strong>proiezione</strong> nello spazio dei parametri, sommata su molti passi con un peso che svanisce.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Da portare via, ben oltre il DPO:</strong> «la loss spinge X verso l'alto» e «X sale dopo l'addestramento» sono due affermazioni diverse. La prima si legge nella formula; la seconda si misura — e su un passo può confermarla mentre su trecento la smentisce. Vale per qualunque loss su parametri condivisi.</p>
+  </div>
+</div>
+
+<h2>Cosa guardare durante un DPO</h2>
+
+<table>
+<tr><th>Metrica</th><th>Cosa ti dice</th></tr>
+<tr><td>loss DPO</td><td>Che l'ottimizzazione procede. Nient'altro.</td></tr>
+<tr><td>Margine dei reward</td><td>Di quanto separa preferite e rifiutate.</td></tr>
+<tr><td>Accuratezza di preferenza</td><td>In che frazione di coppie l'ordine è quello giusto.</td></tr>
+<tr><td><strong>logp(preferita) assoluta</strong></td><td><strong>Se sta crollando, allarme.</strong> È il campanello che le altre tre non suonano.</td></tr>
+<tr><td>KL dal riferimento</td><td>Quanto ti sei allontanato. Se esplode, <code>β</code> è troppo basso.</td></tr>
+<tr><td>Eval held-out (M12)</td><td>L'unica che dice qualcosa sulla <em>qualità</em>.</td></tr>
+</table>
+
+<p>Le prime tre salgono anche quando il modello peggiora. La quarta è il campanello. <strong>La sesta è l'unica che risponde alla domanda che ti stai facendo.</strong></p>
+
+<h2>ORPO: togliere il riferimento</h2>
+
+<p>Il modello di riferimento congelato costa memoria e un secondo passaggio in avanti a ogni passo. ORPO propone di eliminarlo, combinando in un'unica loss il termine di SFT sulla risposta preferita e un termine che penalizza il rapporto di probabilità fra preferita e rifiutata.</p>
+
+<div class="note errore">
+  <div class="mark">Cosa puoi<br>e non puoi<br>dedurre</div>
+  <div class="body">
+    <p><strong>Puoi dedurre</strong> il vantaggio strutturale, e verificarlo con l'aritmetica di M06: meno memoria, meno calcolo per passo. È un fatto sull'algoritmo.</p>
+    <p><strong>Non puoi dedurre</strong> se dia risultati migliori o peggiori sul <em>tuo</em> compito. I numeri pubblicati sono ottenuti su altri compiti con altri modelli. Va misurato, con gli strumenti di M12.</p>
+    <p>Nomi degli iperparametri, default e dettagli di implementazione cambiano fra librerie e versioni: verificali sul tuo stack invece di copiarli.</p>
+  </div>
+</div>
+
+<h2>Quando DPO è la scelta sbagliata</h2>
+
+<ol>
+  <li><strong>Sai scrivere la risposta giusta.</strong> Allora fai SFT: più diretto, segnale più forte, niente riferimento in memoria.</li>
+  <li><strong>Il problema è conoscenza, non preferenza.</strong> Il testo delle risposte preferite <em>contiene</em> segnale fattuale, quindi non è vero che le coppie non insegnino nulla. Ma è un segnale indiretto — l'obiettivo premia la differenza fra due risposte, non la produzione della risposta giusta — e a parità di esempi l'SFT ne dà molto di più. Se ti serve installare fatti, confronta le due strade misurando (M12/M13), non aspettarti che DPO ci arrivi con più coppie.</li>
+  <li><strong>Le coppie sono rumorose.</strong> Se le preferenze sono incoerenti fra loro, il margine sale su rumore. Misura la concordanza fra annotatori prima di fidarti dei dati, esattamente come faresti con un giudice automatico (M12).</li>
+  <li><strong>Non hai un eval indipendente.</strong> Senza M12 non puoi accorgerti del caso qui sopra, e il margine ti dirà che va tutto bene fino al giorno del rilascio.</li>
+</ol>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Il margine sale, l'accuratezza è al 100%, la loss è 0,004. Il modello è migliorato?</li>
+  <li>Quanti modelli tieni in memoria durante un DPO, e cosa cambia nel conto di M06?</li>
+  <li>Perché la log-probabilità della risposta preferita può scendere?</li>
+  <li>Hai un dataset di domande con risposta corretta nota. DPO o SFT?</li>
+  <li>Il KL dal riferimento esplode. Quale iperparametro guardi?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Non lo sai.</strong> Nel lab quegli stessi tre valori accompagnano un modello la cui probabilità di produrre le quattro risposte preferite è <em>scesa</em>. Non basta a dire che generi peggio — per quello serve un eval held-out (M12) — ma basta a dire che quei tre numeri non rispondono alla tua domanda.</p>
+    <p><strong>2.</strong> <strong>Due:</strong> quello addestrato e il riferimento congelato. Il riferimento non ha gradienti né stati optimizer, ma i suoi pesi occupano memoria — e serve un secondo passaggio in avanti a ogni passo.</p>
+    <p><strong>3.</strong> Non perché manchi una spinta verso l'alto: la derivata parziale sulla preferita è negativa, cioè spinge in alto. Ma l'aggiornamento agisce su <strong>parametri condivisi</strong> e su una distribuzione <strong>normalizzata</strong>: abbassare la rifiutata muove pesi comuni, e la massa liberata può finire su continuazioni terze. Il segnale locale non garantisce l'esito assoluto.</p>
+    <p><strong>4.</strong> <strong>SFT.</strong> DPO serve quando non sai scrivere la risposta ideale. Se la sai, stai pagando un modello in più per un segnale più debole.</p>
+    <p><strong>5.</strong> <code>β</code>: controlla l'ancoraggio al riferimento. KL che esplode significa <code>β</code> troppo basso — il modello è libero di allontanarsi troppo.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M01 — Tensori: il mattone</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m01">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M01 · 3 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Tensori: il mattone</h1>
+<p class="subtitle">Un modello da 27 miliardi di parametri è una collezione di scatole di numeri. Questa pagina spiega cos'è una scatola.</p>
+
+<p class="lede">Tutto quello che vedrai nel resto del corso — pesi, gradienti, attivazioni, stati dell'optimizer — è la stessa identica cosa: un tensore. Cambia solo a cosa serve. Se questa pagina entra bene, metà del mistero è già sparito.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Non serve sapere niente per rispondere. Rispondi a intuito, poi apri.</p>
+    <p>Ho una tabella di numeri con <strong>3 righe e 4 colonne</strong>. La moltiplico per un'altra tabella con <strong>4 righe e 2 colonne</strong>.</p>
+    <ol>
+      <li>Quante righe e quante colonne ha il risultato?</li>
+      <li>Perché la seconda tabella deve avere per forza 4 righe?</li>
+      <li>Se la seconda ne avesse 5, cosa succederebbe?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Il risultato ha <strong>3 righe e 2 colonne</strong>. Le righe le eredita dalla prima tabella, le colonne dalla seconda.</p>
+    <p><strong>2.</strong> Perché ogni riga della prima tabella (lunga 4) viene accoppiata con ogni colonna della seconda (alta 4), elemento per elemento, e i prodotti si sommano. Se le lunghezze non coincidono, gli elementi non si accoppiano: alcuni resterebbero senza partner.</p>
+    <p><strong>3.</strong> Errore, immediato. Non produce un risultato sbagliato: proprio non parte.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Se hai risposto «non lo so»:</strong> perfetto, è il punto di partenza previsto. Tieni a mente solo questo, che è il 90% di tutte le forme che vedrai: <code>[3,4] @ [4,2] → [3,2]</code>. Il <strong>4</strong> centrale sparisce, i due esterni sopravvivono.</p>
+  </div>
+</details>
+
+<h2>Cos'è un tensore</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Un <strong>tensore</strong> è un array multidimensionale di numeri, tutti dello stesso tipo. Nient'altro. Il nome fa paura, la cosa no.</p>
+    <p>Si descrive con la <strong>forma</strong> (in inglese <em>shape</em>): la lista delle sue dimensioni.</p>
+  </div>
+</div>
+
+<table>
+<tr><th>Nome</th><th>Forma</th><th>Cos'è</th><th>Esempio nel corso</th></tr>
+<tr><td>Scalare</td><td><code>[]</code></td><td>Un solo numero</td><td>La <em>loss</em>: sempre un singolo numero</td></tr>
+<tr><td>Vettore</td><td><code>[768]</code></td><td>768 numeri in fila</td><td>I pesi di una normalizzazione</td></tr>
+<tr><td>Matrice</td><td><code>[4096, 4096]</code></td><td>Una tabella</td><td>Una matrice di attention</td></tr>
+<tr><td>Tensore 3D</td><td><code>[8, 512, 4096]</code></td><td>8 tabelle impilate</td><td>Le attivazioni: 8 frasi × 512 token × 4096 numeri</td></tr>
+</table>
+
+<p>Le dimensioni non hanno un significato intrinseco: sei tu a decidere cosa rappresentano. In <code>[8, 512, 4096]</code> l'8 sono le frasi elaborate insieme, il 512 la lunghezza di ciascuna, il 4096 quanti numeri descrivono un singolo token. Il tensore non lo sa: per lui sono solo tre assi.</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>solido</div>
+  <div class="body">
+    <p>Un tensore in memoria è <strong>un blocco contiguo di byte più dei metadati</strong>: forma, tipo, e gli <em>stride</em> — di quanti elementi devi saltare per avanzare di uno lungo ciascun asse.</p>
+    <p>È esattamente l'idea di un array row-major in C. Come lì, «trasporre» può essere gratis — cambi gli stride, non i byte — mentre altre operazioni richiedono una copia perché pretendono memoria contigua. Quando in PyTorch leggerai <code>.contiguous()</code>, è questo: <em>materializza davvero il riordino che finora era solo nei metadati</em>.</p>
+    <p>Se questo ponte ti è chiaro, hai già un vantaggio su chi arriva dalla matematica pura: la maggior parte degli errori di forma sono errori di layout, non di algebra.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 01.1<br>forme</div>
+  <div class="body">
+    <p>Sul portatile. Crea e stampa tensori, guarda cosa cambia.</p>
+    <pre><code>python3 corso/labs/lab_01_1_forme.py</code></pre>
+    <p>Non leggere l'output prima di aver fatto la previsione qui sotto.</p>
+  </div>
+</div>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Prima di lanciarlo, scrivi cosa stamperà per queste tre righe:</p>
+    <pre><code>a = torch.zeros(3, 4)
+b = torch.zeros(4, 2)
+print(a.shape, b.shape, (a @ b).shape)
+print(a.dtype, a.numel(), a.element_size())
+print(a.numel() * a.element_size(), "byte")</code></pre>
+    <p>Tre numeri e due parole. Se non sai cosa sia <code>dtype</code>, scrivi «non lo so»: è il modulo M05.</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre><code>torch.Size([3, 4]) torch.Size([4, 2]) torch.Size([3, 2])
+torch.float32 12 4
+48 byte</code></pre>
+    <p><code>numel()</code> è il numero di elementi: 3×4 = 12. <code>element_size()</code> è quanti byte occupa <em>un</em> numero: 4, perché il tipo di default è <code>float32</code>, cioè 32 bit = 4 byte.</p>
+    <p><strong>Quei 48 byte sono il primo mattone dell'aritmetica della memoria.</strong> Un modello da 27 miliardi di parametri è la stessa moltiplicazione, con numeri più grandi: <code>27·10⁹ × (byte per numero)</code>. Tutto M06 è questa formula, complicata dai termini che si aggiungono.</p>
+  </div>
+</details>
+
+<h2>La regola delle forme</h2>
+
+<p>Il prodotto fra matrici è l'operazione che il 99% del tempo di calcolo di un modello esegue. Ha una sola regola:</p>
+
+<pre><code>[a, b] @ [b, c]  →  [a, c]
+      ↑     ↑
+   devono coincidere: qui si "salda" il prodotto</code></pre>
+
+<p>Le due dimensioni interne devono essere uguali e <strong>spariscono</strong>. Le due esterne sopravvivono. Se le interne non coincidono, PyTorch solleva un errore e si ferma.</p>
+
+<div class="note errore">
+  <div class="mark">Errore comune</div>
+  <div class="body">
+    <p><strong>Un errore di forma è una buona notizia.</strong> Ti si ferma subito, con un messaggio preciso, prima di sprecare ore di GPU.</p>
+    <p>Il vero nemico è l'opposto: un'operazione che <em>non</em> fallisce ma calcola una cosa diversa da quella che intendevi. Succede col <em>broadcasting</em> (fra due paragrafi) e succede in modo micidiale con le maschere della loss, in M11. Quelli sono i bug che ti costano una settimana, perché non hanno messaggio d'errore: hanno solo un risultato mediocre.</p>
+  </div>
+</div>
+
+<h3>Perché i pesi sono salvati «al contrario»</h3>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Uno strato lineare in PyTorch (<code>nn.Linear</code>) salva la sua matrice di pesi con forma <strong><code>[out_features, in_features]</code></strong>: prima l'uscita, poi l'ingresso.</p>
+    <p>È l'inverso di come la scriveresti in algebra, e sotto sotto è una convenzione — nasce dal fatto che il calcolo eseguito è <code>x @ W.T</code>, con la trasposizione già incorporata.</p>
+  </div>
+</div>
+
+<p>Devi solo saperlo. Da qui nasce circa metà degli errori di lettura delle forme quando aprirai un modello vero in M04:</p>
+
+<pre data-lab="nessuno"><code>import torch.nn as nn
+layer = nn.Linear(in_features=4096, out_features=11008)
+print(layer.weight.shape)     # torch.Size([11008, 4096])  ← out, in
+print(layer.bias.shape)       # torch.Size([11008])</code></pre>
+
+<p>Quindi quando in M04 leggerai un tensore chiamato <code>mlp.up_proj.weight</code> con forma <code>[11008, 4096]</code>, saprai leggerlo subito: <em>prende 4096 numeri, ne produce 11008</em>.</p>
+
+<h3>La dimensione batch</h3>
+
+<p>I modelli non elaborano un esempio alla volta: ne impilano tanti, e la prima dimensione diventa «quanti». La regola del prodotto continua a valere sulle ultime due dimensioni, e quelle davanti vengono trascinate:</p>
+
+<pre data-lab="nessuno"><code>x = torch.zeros(8, 512, 4096)   # 8 frasi, 512 token ciascuna, 4096 numeri per token
+W = torch.zeros(4096, 11008)
+print((x @ W).shape)            # torch.Size([8, 512, 11008])</code></pre>
+
+<p>Le forme <code>[512, 4096] @ [4096, 11008] → [512, 11008]</code> si comportano come prima; l'8 davanti resta lì, intatto. È il motivo per cui raddoppiare il batch raddoppia la memoria delle attivazioni: stai letteralmente impilando più copie.</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>parziale</div>
+  <div class="body">
+    <p>La dimensione batch somiglia al parallelismo di richieste che conosci: più lavori indipendenti elaborati insieme per usare meglio l'hardware.</p>
+    <p><strong>Dove l'analogia si rompe:</strong> in inferenza le richieste in un batch sono davvero indipendenti. In addestramento no — i gradienti dei singoli esempi vengono <em>mediati</em> in un unico aggiornamento. Il batch non è solo throughput: <strong>cambia il risultato dell'addestramento</strong>. Un batch più grande dà una direzione meno rumorosa, e obbliga a cambiare il learning rate. Ne parliamo in M08.</p>
+  </div>
+</div>
+
+<h3>Broadcasting</h3>
+
+<p>Quando le forme non coincidono, PyTorch a volte non fallisce: allunga silenziosamente la dimensione più corta. Serve — è così che si somma un bias a tutte le righe — ma è anche una fabbrica di bug muti.</p>
+
+<pre><code>a = torch.zeros(3, 4)
+b = torch.zeros(4)          # un vettore
+print((a + b).shape)        # [3, 4]  ← b è stato ripetuto su ogni riga
+
+c = torch.zeros(3, 1)
+print((a + c).shape)        # [3, 4]  ← c ripetuto su ogni colonna
+
+d = torch.zeros(3)
+print((a + d).shape)        # ERRORE: 3 non si allinea con 4</code></pre>
+
+<p>Regola: si confrontano le forme <strong>da destra verso sinistra</strong>. Due dimensioni sono compatibili se sono uguali, oppure se una delle due vale 1.</p>
+
+<div class="note errore">
+  <div class="mark">Errore comune</div>
+  <div class="body">
+    <p>Il caso che fa male davvero:</p>
+    <pre data-lab="nessuno"><code>pred = torch.zeros(32, 1)      # 32 previsioni, colonna
+targ = torch.zeros(32)         # 32 valori veri, riga
+print((pred - targ).shape)     # [32, 32]  ← non [32]</code></pre>
+    <p>Volevi 32 differenze, ne hai ottenute 1024: ogni previsione confrontata con ogni valore vero. Nessun errore. La loss che ne esce è un numero perfettamente plausibile e completamente insensato, e l'addestramento «funziona» producendo risultati scadenti.</p>
+    <p><strong>Quanto sei avvisato dipende da come scrivi la loss</strong>, e la differenza conta:</p>
+    <table style="margin:10px 0">
+      <tr><th>Come calcoli</th><th>Avviso?</th></tr>
+      <tr><td><code>F.mse_loss(pred, targ)</code></td><td><strong>Sì.</strong> <code>UserWarning: Using a target size ... different to the input size ... will likely lead to incorrect results due to broadcasting</code></td></tr>
+      <tr><td><code>(pred - targ).pow(2).mean()</code></td><td><strong>No.</strong> Nessun avviso possibile: qui il broadcasting è una funzionalità legittima, e nessuno sa che i due tensori dovrebbero corrispondere.</td></tr>
+    </table>
+    <p>Quindi la funzione di libreria ti protegge, perché sa che quei due argomenti sono «previsione» e «bersaglio». Una loss scritta a mano no — e in un fine-tuning reale la loss è quasi sempre scritta a mano, con maschere e pesi per token.</p>
+    <p><strong>E c'è un secondo motivo per non fidarsi dell'avviso:</strong> Python stampa ogni warning una sola volta per default. Un <code>UserWarning</code> emesso al passo 0, in mezzo a migliaia di righe di log, non lo vede nessuno. Non è un allarme: è una nota a piè di pagina.</p>
+    <p><strong>Difesa — e attenzione, quella ovvia non funziona.</strong> Guardare la forma della loss <em>non</em> rileva niente: le funzioni di loss riducono a uno scalare per default, quindi ottieni <code>[]</code> sia nel caso giusto sia in quello sbagliato. La riduzione nasconde il bug invece di rivelarlo.</p>
+    <p>Quello che funziona è controllare le forme <strong>prima</strong> della riduzione:</p>
+    <pre style="margin:10px 0" data-lab="nessuno"><code>assert pred.shape == targ.shape, f"{pred.shape} != {targ.shape}"
+
+# oppure, per vedere cosa sta davvero succedendo:
+d = torch.nn.functional.mse_loss(pred, targ, reduction="none")
+print(d.shape)     # [32,32] rivela il bug, [32] o [32,1] no</code></pre>
+    <p>E in generale: quando una forma ti sorprende, non aggirarla con un <code>reshape</code>. Capisci perché è quella.</p>
+  </div>
+</div>
+
+<h2>Viste contro copie</h2>
+
+<p>Alcune operazioni non toccano i byte, cambiano solo i metadati. Altre copiano davvero. Su un tensore da 3 elementi non te ne accorgi; su uno da 40 GB è la differenza fra funzionare e riempire la memoria.</p>
+
+<pre data-lab="nessuno"><code>a = torch.zeros(4096, 4096)
+b = a.t()                    # trasposta: VISTA, zero byte copiati
+c = a.view(-1)               # appiattito: VISTA
+d = a.clone()                # COPIA: altri 64 MB
+print(a.data_ptr() == b.data_ptr())   # True  → stessi byte
+print(a.data_ptr() == d.data_ptr())   # False → byte nuovi</code></pre>
+
+<p><code>data_ptr()</code> è l'indirizzo di memoria del blocco. Uguale significa stessa memoria: modificare uno modifica l'altro.</p>
+
+<div class="note lab">
+  <div class="mark">Lab 01.2<br>viste e copie</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_01_2_viste.py</code></pre>
+    <p>Misura il costo reale di una copia e mostra la differenza fra vista e copia sugli indirizzi di memoria.</p>
+  </div>
+</div>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un tensore <code>[4096, 4096]</code> in <code>float32</code>.</p>
+    <ol>
+      <li>Quanti <strong>elementi</strong> contiene?</li>
+      <li>Quanti <strong>byte</strong> occupa? E quanti MB?</li>
+      <li><code>a.t()</code> quanti byte aggiuntivi alloca?</li>
+      <li><code>a.clone()</code> quanti byte aggiuntivi alloca?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> 4096 × 4096 = <strong>16 777 216</strong> elementi (16,8 milioni).</p>
+    <p><strong>2.</strong> × 4 byte = <strong>67 108 864 byte</strong> = 67,1 MB (oppure esattamente 64 MiB).</p>
+    <p><strong>3.</strong> <strong>Zero.</strong> È una vista: cambiano gli stride, non i byte.</p>
+    <p><strong>4.</strong> <strong>Altri 67,1 MB.</strong> Copia vera.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Nota il punto 2: hai appena fatto il conto che in M06 farai su un modello intero. <strong>Numero di parametri × byte per parametro.</strong> Per un modello da 27B in float32: 27·10⁹ × 4 = 108 GB, solo per i pesi, senza niente altro. Su una GPU da 141 GB. Comincia a intuirsi perché nessuno addestra in float32.</p>
+  </div>
+</details>
+
+<h2>Da qui in poi</h2>
+
+<p>Ogni cosa che incontrerai è un tensore con un ruolo diverso:</p>
+
+<table>
+<tr><th>Ruolo</th><th>Forma tipica</th><th>Modulo</th></tr>
+<tr><td>Peso — quello che il modello impara</td><td><code>[11008, 4096]</code></td><td>M04</td></tr>
+<tr><td>Gradiente — di quanto cambiare quel peso</td><td><code>[11008, 4096]</code>, identica al peso</td><td>M02, M07</td></tr>
+<tr><td>Stato dell'optimizer — la memoria degli aggiornamenti passati</td><td>identica al peso, ma <em>due volte</em></td><td>M08</td></tr>
+<tr><td>Attivazione — i valori intermedi durante il calcolo</td><td><code>[batch, seq, 4096]</code></td><td>M07</td></tr>
+<tr><td>Loss — quanto sbaglia</td><td><code>[]</code>, uno scalare</td><td>M03</td></tr>
+</table>
+
+<p>Il fatto che gradiente e peso abbiano <strong>la stessa identica forma</strong> non è un dettaglio: è il motivo per cui addestrare costa almeno il doppio della memoria che serve a far girare il modello. È il primo termine dell'aritmetica di M06.</p>
+
+<h2>Verifica</h2>
+
+<p>Rispondi senza rileggere. Se una risposta non esce, la sezione va ripassata.</p>
+
+<ol>
+  <li>Forma di <code>[8, 512, 4096] @ [4096, 1024]</code>?</li>
+  <li>Un <code>nn.Linear(1024, 4096)</code>: che forma ha <code>.weight</code>?</li>
+  <li>Perché <code>a.t()</code> è gratis e <code>a.clone()</code> no?</li>
+  <li>Un tensore <code>[2, 1024, 768]</code> in float32: quanti MB?</li>
+  <li>Sommi <code>[64, 1]</code> e <code>[64]</code>. Cosa esce e perché è quasi sempre un bug?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>[8, 512, 1024]</code>. Il 4096 si salda e sparisce, l'8 viene trascinato.</p>
+    <p><strong>2.</strong> <code>[4096, 1024]</code> — <code>[out, in]</code>, invertito rispetto agli argomenti.</p>
+    <p><strong>3.</strong> La trasposta cambia solo i metadati (stride): stesso blocco di byte. <code>clone()</code> alloca un blocco nuovo e ci copia dentro tutto.</p>
+    <p><strong>4.</strong> 2 × 1024 × 768 = 1 572 864 elementi × 4 byte = 6 291 456 byte ≈ <strong>6,3 MB</strong> (6 MiB esatti).</p>
+    <p><strong>5.</strong> Esce <code>[64, 64]</code>: broadcasting incrocia tutto con tutto. Volevi 64 valori, ne hai 4096. Nessun errore, risultato senza senso.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

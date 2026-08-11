@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M18 — Parallelismo su più GPU</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m18">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M18 · 10 h · <span class="pill cpu">CPU per l'aritmetica</span><span class="pill gpu">GPU per la misura</span></p>
+<h1>Parallelismo su più GPU</h1>
+<p class="subtitle">Il modulo che chiude il conto aperto in M06: non hai la somma delle memorie finché non scegli <em>come</em> partizionare — e ogni scelta ha un prezzo in comunicazione.</p>
+
+<p class="lede">Qui il tuo mestiere aiuta più che in qualsiasi altro modulo. Ma un riflesso va disinnescato: <strong>aggiungere una GPU non aggiunge memoria</strong>, a meno che tu non scelga esplicitamente una strategia che partiziona.</p>
+
+<div class="note nozione">
+  <div class="mark">N schede,<br>qui N = 2</div>
+  <div class="body">
+    <p>Tutto il modulo vale per <strong><em>N</em> schede</strong>: le strategie, i divisori, il prezzo in comunicazione. I numeri svolti usano il profilo di riferimento, dove <em>N</em> = 2 — e due è il minimo che rende visibile la differenza fra replicare e partizionare.</p>
+    <p>Due avvertenze che il caso a <em>N</em> = 2 non può mostrarti: su <strong>più nodi</strong> l'all-gather attraversa la rete invece dell'interconnessione interna, e il costo cambia di ordine di grandezza; su <strong>memoria unificata</strong> non c'è niente da partizionare, perché il pool è uno solo. Entrambi sono in <strong>M18b</strong>.</p>
+  </div>
+</div>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Full fine-tuning di un modello da 27B: <strong>432 GB statici</strong>, come calcolato in M06. Hai due GPU da 141 GB.</p>
+    <ol>
+      <li>Con <strong>DDP</strong>, quanti GB occupa ogni GPU?</li>
+      <li>Con <strong>ZeRO-3</strong>?</li>
+      <li>Qual è la strategia giusta: la più aggressiva disponibile, o un'altra?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_18_1"><code>strategia             pesi    grad   stati  master    GB/GPU   entra?
+singola GPU             /1      /1      /1      /1     432.0       NO
+DDP                     /1      /1      /1      /1     432.0       NO
+ZeRO-1                  /1      /1      /2      /2     270.0       NO
+ZeRO-2                  /1      /2      /2      /2     243.0       NO
+ZeRO-3 / FSDP           /2      /2      /2      /2     216.0       NO
+tensor parallel         /2      /2      /2      /2     216.0       NO</code></pre>
+    <p><strong>1. 432 GB</strong> — gli stessi. Guarda la riga DDP: divide per <strong>1</strong> ogni voce. <strong>DDP non riduce la memoria, la replica.</strong> Due GPU danno il doppio del throughput e zero byte in più per il modello.</p>
+    <p><strong>2. 216 GB</strong> per GPU. Ancora sopra i 141: <strong>nemmeno ZeRO-3 basta</strong> per un full fine-tuning di questo modello su due schede.</p>
+    <p><strong>3. La meno aggressiva che fa entrare il modello</strong>, non la più aggressiva disponibile. Il perché è due sezioni più sotto.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 18.1<br>parallelismo</div>
+  <div class="body">
+    <pre><code># aritmetica, gira ovunque
+python3 corso/labs/lab_18_1_parallelismo.py
+
+# misura vera, sul nodo con le GPU
+torchrun --nproc_per_node=2 corso/labs/lab_18_1_parallelismo.py --misura</code></pre>
+    <p>Senza CUDA la sezione 5 si ferma con un messaggio esplicito invece di stampare numeri stimati.</p>
+  </div>
+</div>
+
+<h2>Cosa partiziona ciascuna strategia</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Le quattro voci statiche di M06 — pesi, gradienti, stati optimizer, master fp32 — possono essere <strong>replicate</strong> o <strong>partizionate</strong>, e ogni strategia sceglie diversamente.</p>
+    <ul>
+      <li><strong>DDP</strong> replica tutto. Ogni GPU ha una copia completa e processa un batch diverso; a fine passo i gradienti vengono mediati fra tutte.</li>
+      <li><strong>ZeRO-1</strong> partiziona solo stati optimizer e master.</li>
+      <li><strong>ZeRO-2</strong> aggiunge i gradienti.</li>
+      <li><strong>ZeRO-3 / FSDP</strong> partiziona anche i pesi: ogni GPU ne tiene una fetta e la raduna quando serve.</li>
+      <li><strong>Tensor parallel</strong> spezza le singole matrici <em>dentro</em> ogni strato.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Il prezzo: la comunicazione</h2>
+
+<pre><code>DDP              all-reduce dei gradienti      ~ 2 × (P × byte_grad)
+ZeRO-1           come DDP + scatter/gather degli stati
+ZeRO-2           reduce-scatter gradienti + all-gather pesi
+ZeRO-3 / FSDP    all-gather dei pesi PER OGNI STRATO, avanti e indietro
+tensor parallel  all-reduce DENTRO ogni strato, più volte per strato</code></pre>
+
+<p>Ogni strategia che partiziona deve poi <strong>rimettere insieme i pezzi</strong>. Più partizioni, più comunichi.</p>
+
+<div class="note errore">
+  <div class="mark">Ordini di<br>grandezza, non<br>valori esatti</div>
+  <div class="body">
+    <p>Il traffico reale dipende dall'implementazione, dal raggruppamento dei parametri, e soprattutto da quanto la libreria riesce a <strong>sovrapporre comunicazione e calcolo</strong> — una comunicazione che avviene mentre la GPU calcola altro può essere quasi gratuita.</p>
+    <p>Quindi queste righe dicono <em>quale strategia comunica di più</em>, non quanto ti costerà. La differenza fra «entra» e «entra ed è veloce» <strong>si misura</strong>.</p>
+  </div>
+</div>
+
+<h2>Due domande da tenere separate</h2>
+
+<table>
+<tr><th>Domanda</th><th>Come si risponde</th></tr>
+<tr><td><strong>Ci sta?</strong></td><td>Aritmetica. Su carta, con M06, senza accendere niente.</td></tr>
+<tr><td><strong>È veloce?</strong></td><td>Misura. Solo eseguendo.</td></tr>
+</table>
+
+<p>Sono <strong>indipendenti</strong>, e confonderle porta all'errore più comune del modulo.</p>
+
+<div class="note errore">
+  <div class="mark">Non attivare<br>ZeRO-3 «per<br>sicurezza»</div>
+  <div class="body">
+    <p>ZeRO-3 fa entrare quasi tutto, e può essere <strong>molto più lento</strong> di ZeRO-1 che ci sta per un pelo — perché raduna i pesi a ogni strato, in andata e in ritorno.</p>
+    <p><strong>La strategia giusta è la meno aggressiva che fa entrare il modello.</strong> Attivare la più aggressiva disponibile significa pagare comunicazione per una capienza che non ti serviva.</p>
+    <p>Il criterio è operativo: calcola con M06 quale sia il livello minimo sufficiente, attiva quello, misura. Sali di livello solo se non entra.</p>
+  </div>
+</div>
+
+<h2>Due GPU non sono un cluster</h2>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>solido, ma<br>con un limite</div>
+  <div class="body">
+    <p>Il ponte con l'infrastruttura regge bene: banda, latenza, topologia, sovrapposizione fra I/O e calcolo sono esattamente i concetti che già usi.</p>
+    <p><strong>Su un solo nodo:</strong> la comunicazione passa da un'interconnessione veloce, non esistono i problemi di rete fra nodi, e il tensor parallel — che richiede banda altissima — è praticabile.</p>
+    <p><strong>Su un cluster:</strong> la comunicazione fra nodi passa dalla rete, ordini di grandezza più lenta. Il tensor parallel si tiene <em>dentro</em> il nodo, gli altri paralleli attraversano i nodi. E compaiono guasti che qui non vedi: un nodo lento rallenta tutti, un nodo morto ferma il run.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Due punti<br>non sono<br>una curva</div>
+  <div class="body">
+    <p>Con due GPU hai <strong>due punti di misura</strong> per lo scaling. Non bastano a estrapolare una curva, e qualunque conclusione su «come scalerebbe a 8 o a 64» è un'ipotesi, non una misura.</p>
+    <p>Quello che <em>puoi</em> imparare qui: quale strategia fa entrare cosa, e <strong>come si misura</strong> lo scaling. Quello che non puoi: il comportamento a scala, che dipende da una topologia che non hai. È dichiarato anche nella pagina iniziale del corso, ed è uno dei limiti onesti del percorso.</p>
+  </div>
+</div>
+
+<h2>La misura, sul nodo</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi<br>prima di<br>lanciare</div>
+  <div class="body">
+    <p>Prima di eseguire la sezione 5 con <code>torchrun</code>, scrivi due numeri:</p>
+    <ul>
+      <li><strong>Memoria per rank con DDP:</strong> ____ GB (la tabella 1 ti dà la previsione)</li>
+      <li><strong>Efficienza di scaling 1→2 GPU:</strong> ____ % (100% = tempo esattamente dimezzato)</li>
+    </ul>
+    <p>Poi confronta, ma <strong>voce per voce, non sul totale</strong>. Il lab stampa separatamente pesi, gradienti e stati optimizer con i dtype che il processo ha davvero costruito, e c'è un motivo preciso: il ramo GPU del lab è <code>fp32</code> con AdamW nativo — <code>4 + 4 + 8 = 16</code> byte per parametro — mentre la tabella di M06 assume pesi <code>bf16</code>, gradienti <code>bf16</code>, momenti <code>fp32</code> e master <code>fp32</code>, cioè <code>2 + 2 + 8 + 4 = 16</code>. <strong>Stesso totale, decomposizione diversa.</strong> Un accordo sul totale non convaliderebbe nessuna delle quattro voci: è esattamente il tipo di conferma che non conferma niente.</p>
+    <p>E sul tempo: quello che manca al 100% è <strong>overhead complessivo di scaling</strong>, non «comunicazione». Ci stanno dentro, indistinguibili da questa misura, il traffico collettivo, le sincronizzazioni, lo sbilanciamento fra rank, il cambiamento del calcolo per rank e il costo di lanciare i kernel. Per attribuirne una quota alla comunicazione serve una misura separata — un profiler, o un run con i collettivi disattivati.</p>
+    <p><strong>Non verificato qui:</strong> questa sezione non è mai stata eseguita su GPU. Il ramo si ferma pulito senza CUDA — quello sì è verificato — ma i numeri che produce su hardware vero restano da controllare.</p>
+    <p><strong>Quello che il corso prevede, e che puoi smentire:</strong></p>
+    <ul>
+      <li>il picco per rank con <strong>DDP</strong> sarà circa il conto statico <em>intero</em>, non diviso per il numero di schede. Mi smentisci se cala aumentando le GPU senza che tu abbia attivato ZeRO;</li>
+      <li>l'efficienza di scaling sarà <strong>sotto il 100%</strong>. Mi smentisci se la superi — vorrebbe dire che a una GPU c'era un collo di bottiglia che non ho considerato;</li>
+      <li>la somma delle quattro voci misurate sarà <strong>minore del picco</strong>, per attivazioni, frammentazione e buffer NCCL. Mi smentisci se il picco è minore della somma: allora sto contando una voce che non esiste, e il difetto è in M06.</li>
+    </ul>
+    <p>Se hai l'hardware, sei nella posizione di chiudere quella lacuna. Il lab accetta <code>--registra</code>, che salva le misure di questo ambiente in <code>labs/expected/</code> insieme alla riga che lo dichiara, e <code>--confronta</code>, che le rimette a fianco di quelle appena misurate con lo scarto relativo. Quali celle sono ancora vuote sta in <code>corso/AMBIENTI.md</code>.</p>
+    <p><strong>Guarda l'output prima di registrarlo.</strong> Se un numero non ha senso hai trovato un difetto, non un riferimento — e registrarlo lo trasformerebbe nell'atteso sbagliato per chiunque venga dopo.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Passi da 1 a 2 GPU con DDP. Quanta memoria in più hai per il modello?</li>
+  <li>Il tuo modello entra con ZeRO-1. Conviene usare ZeRO-3?</li>
+  <li>Perché il tensor parallel è praticabile su un nodo e problematico fra nodi?</li>
+  <li>Passi da 1 a 2 GPU con DDP senza toccare la configurazione. Cosa è cambiato nell'addestramento, oltre alla velocità?</li>
+  <li>Misuri un'efficienza di scaling del 60%. Cosa concludi, e cosa <em>non</em> puoi concludere?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1. Zero.</strong> DDP replica: stessa memoria per GPU, doppio throughput. Per avere più capienza serve una strategia che partiziona.</p>
+    <p><strong>2. No.</strong> Pagheresti comunicazione — all-gather dei pesi a ogni strato, avanti e indietro — per una capienza che non ti serve. Si usa il livello minimo sufficiente.</p>
+    <p><strong>3.</strong> Perché comunica <em>dentro</em> ogni strato, più volte per strato: richiede banda altissima e bassa latenza. Un'interconnessione fra GPU dello stesso nodo la regge, una rete fra nodi no.</p>
+    <p><strong>4.</strong> Il <strong>batch effettivo è raddoppiato</strong> (M08): <code>micro × accumulazioni × GPU</code>. Non è lo stesso addestramento, e confrontarlo con quello a una GPU senza compensare significa confrontare due cose diverse.</p>
+    <p><strong>5.</strong> <strong>Puoi concludere</strong> che nel tuo caso il 40% del guadagno teorico se ne va in <em>overhead complessivo di scaling</em>, e che vale la pena indagare. <strong>Non puoi concludere</strong> che quel 40% sia comunicazione: la misura è un tempo totale per passo, e ci stanno dentro anche sincronizzazioni, sbilanciamento fra rank, variazioni del calcolo e lancio dei kernel. Per attribuirlo serve un profiler. E non puoi concludere niente su come scalerebbe a 8 GPU: due punti non definiscono una curva.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/conti.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

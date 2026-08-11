@@ -1,0 +1,7 @@
+# ambiente: torch=2.2.2 cuda=- gpu=- piattaforma=Darwin-x86_64
+# tolleranza dichiarata: 10% relativo
+attn_b1_s128_MB	1.703944
+attn_b2_s128_MB	2.621448
+attn_b1_s256_MB	3.145736
+attn_b4_s256_MB	10.223624
+attn_b2_s512_MB	14.417928

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M12 — Valutazione</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m12">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M12 · 8 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Valutazione</h1>
+<p class="subtitle">Il debito che ho contratto in M02 e M11: come si fa a sapere se una differenza è reale.</p>
+
+<p class="lede">Questo modulo viene <em>prima</em> di quelli sull'addestramento, e non è una scelta stilistica. Senza saper misurare, ogni run successivo produce un numero che non sai interpretare — e la maggior parte dei fine-tuning fallisce nella valutazione, non nell'ottimizzazione.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Due modelli. Il modello B è <strong>davvero</strong> migliore di A: la differenza vera è <strong>3,3 punti</strong> di accuratezza. Lo sai per costruzione — nella realtà non lo sapresti mai.</p>
+    <ol>
+      <li>Li valuti su <strong>100 esempi</strong>. Su 10 valutazioni indipendenti, quante volte pensi che il confronto dia il risultato <em>sbagliato</em>?</li>
+      <li>Passi a <strong>2000 esempi</strong> e usi un intervallo di confidenza. In che percentuale dei casi riesci a dichiarare la differenza reale? Novantacinque per cento? Ottanta?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_12_1"><code> run    acc A    acc B      diff  conclusione ingenua
+   1    0.610    0.700    +0.090  B meglio
+   5    0.580    0.630    +0.050  B meglio
+   6    0.690    0.660    -0.030  A meglio  <- SBAGLIATO
+   7    0.720    0.640    -0.080  A meglio  <- SBAGLIATO
+   8    0.640    0.640    +0.000  PARI
+   9    0.750    0.690    -0.060  A meglio  <- SBAGLIATO
+
+In 4/10 run la conclusione ingenua è sbagliata o nulla</code></pre>
+    <p><strong>1. Quattro volte su dieci.</strong> Tre volte conclude l'opposto del vero, una volta dichiara parità. Con 100 esempi un singolo numero non è una misura: è un campione rumoroso.</p>
+    <pre data-lab="lab_12_1"><code>     n   trova la differenza   direzione sbagliata
+    50                    5%                    0%
+   250                   16%                    0%
+   500                   32%                    0%
+  1000                   50%                    0%
+  2000                   74%                    0%</code></pre>
+    <p><strong>2. Il 74%.</strong> Anche con duemila esempi, <strong>un quarto delle volte concludi «non dimostrato»</strong> pur essendoci una differenza reale di 3,3 punti.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Guarda però la colonna di destra: <strong>zero casi su 200</strong> a ogni dimensione. <strong>Attenzione a come si legge:</strong> non è una garanzia. Un intervallo al 95% <em>può</em> escludere lo zero dal lato sbagliato — è raro, non impossibile. Con 0 casi su 200, il limite superiore al 95% su quel tasso resta intorno all'1,5%.</p>
+    <p>E anche l'1,5% va letto per quello che è: è il limite superiore sul tasso <em>di questa simulazione ripetuta</em>, sotto l'assunzione di 200 prove indipendenti nello stesso regime. Non è una proprietà dell'intervallo in generale.</p>
+    <p>La proprietà vera è più modesta e comunque preziosa: <strong>quello del lab è un intervallo bootstrap percentile al 95% <em>nominale</em></strong> — la copertura effettiva dipende dalla distribuzione e dalla dimensione campionaria, e il 95% è l'obiettivo dichiarato, non una garanzia. Ma anche così il tasso di conclusioni invertite misurato è piccolo, mentre nel confronto ingenuo era 3 su 10. Non «zero contro qualcosa»: raro e misurato contro frequente e non controllato.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 12.1<br>valutazione</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_12_1_eval.py</code></pre>
+    <p>Simula due modelli con una differenza vera e nota, poi misura quanto spesso una valutazione la trova e quanto spesso mente.</p>
+  </div>
+</div>
+
+<h2>Bootstrap: un intervallo invece di un numero</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Non puoi ripetere la valutazione mille volte su dati nuovi. Ma puoi <strong>ricampionare quelli che hai</strong>: estrai <em>n</em> esempi con reinserimento dal tuo insieme, ricalcola la metrica, ripeti duemila volte. La dispersione dei risultati stima quanto la tua misura dipende dal campione che ti è capitato.</p>
+    <p>Il 2,5° e il 97,5° percentile di quella distribuzione sono l'<strong>intervallo di confidenza al 95%</strong>.</p>
+    <p><strong>La regola di lettura è una sola:</strong> se l'intervallo contiene lo zero, non hai dimostrato niente. Non «probabilmente non c'è differenza» — <em>non hai dimostrato niente</em>, che è compatibile sia con l'assenza di differenza sia con una differenza che non hai abbastanza esempi per vedere.</p>
+  </div>
+</div>
+
+<pre data-lab="lab_12_1"><code>500 esempi, confronto appaiato
+  differenza osservata  +0.0560
+  IC 95%                [+0.0040, +0.1060]
+  esclude lo zero?      SI -> differenza reale
+  differenza vera: +0.0332   dentro l'intervallo? True</code></pre>
+
+<p>La differenza <em>osservata</em> è 5,6 punti, quella <em>vera</em> è 3,3. L'intervallo li contiene entrambi. Riportare «il modello migliora di 5,6 punti» sarebbe sbagliato: quel numero è un'estrazione, non una misura.</p>
+
+<h2>Appaiato o no: la stessa spesa, meno rumore</h2>
+
+<pre data-lab="lab_12_1"><code>     n   APPAIATO: ampiezza IC   NON APPAIATO: ampiezza IC
+   100                  0.2400                      0.2900
+   250                  0.1360                      0.1680
+   500                  0.1000                      0.1160
+  1000                  0.0720                      0.0810</code></pre>
+
+<p>A parità di esempi, valutare entrambi i modelli sugli <strong>stessi</strong> item dà un intervallo più stretto — qui fra l'11% e il 19%.</p>
+
+<p><strong>Il motivo:</strong> buona parte del rumore viene dalla difficoltà degli esempi, non dai modelli. Alcuni item sono difficili per entrambi. Se entrambi vedono gli stessi item, quella componente si cancella nella differenza.</p>
+
+<p>Non è una comodità organizzativa: è quello che rende la misura utilizzabile a parità di budget.</p>
+
+<h2>«Quanti esempi servono?»</h2>
+
+<div class="note errore">
+  <div class="mark">La domanda<br>è mal posta</div>
+  <div class="body">
+    <p>Non esiste un numero. La tabella qui sopra dipende interamente da <strong>quanto è grande la differenza che vuoi rilevare</strong>: 3,3 punti richiedono migliaia di esempi, 10 punti molti meno, 0,5 punti molti di più.</p>
+    <p>E il costo cresce circa col <strong>quadrato</strong> della finezza: dimezzare la differenza rilevabile costa circa <strong>quattro volte</strong> gli esempi.</p>
+    <p>La domanda giusta è: <strong>«qual è la differenza minima che mi interessa davvero?»</strong> Da lì si ricava la dimensione, e spesso si scopre che la differenza che si sperava di misurare richiederebbe un insieme di valutazione più grande di quello che si è disposti a costruire. È un'informazione utile: dice di cambiare metrica o obiettivo, non di lanciare il run e sperare.</p>
+  </div>
+</div>
+
+<p>In M11 avevo proposto di misurare la curva addestrando al 25%, 50% e 100% dei dati. Adesso hai il pezzo mancante: <strong>quei tre punti vanno riportati con i loro intervalli</strong>, o non sono una curva. Tre valori senza barre d'errore sono tre estrazioni.</p>
+
+<h2>LLM-as-judge</h2>
+
+<pre data-lab="lab_12_1"><code>    bias   ordine casuale   A sempre primo
+    0.00            0.520            0.503
+    0.05            0.516            0.448
+    0.10            0.524            0.402
+    0.20            0.527            0.314</code></pre>
+
+<p>Il giudice deve dire quale dei due modelli preferisce. Senza bias preferisce B — quello davvero migliore — nel <strong>52%</strong> dei confronti: l'effetto da misurare vale 2 punti sopra il pareggio.</p>
+
+<div class="note errore">
+  <div class="mark">Quando il bias<br>supera l'effetto</div>
+  <div class="body">
+    <p>Con l'ordine di presentazione <strong>fissato</strong>, bastano <strong>5 punti</strong> di preferenza per il candidato mostrato per primo perché la stima scenda a <code>0,448</code>: sotto il pareggio. <strong>Il giudice ora dichiara migliore il modello peggiore.</strong></p>
+    <p>Con ordine <em>casuale</em>, lo stesso bias si compensa e la stima resta a 0,52.</p>
+    <p>La regola generale: <strong>quando il bias supera l'effetto che stai misurando, il verdetto lo decide il bias.</strong> E gli effetti che ti interessano sono quasi sempre piccoli — è raro dover distinguere fra un modello ottimo e uno pessimo.</p>
+    <p><strong>Difesa minima:</strong> alterna l'ordine di presentazione e verifica che invertendolo il verdetto non cambi. Se cambia, stai misurando l'ordine, non la qualità.</p>
+  </div>
+</div>
+
+<p>Il difetto più comune di una valutazione con giudice automatico non è il giudice impreciso — l'imprecisione casuale si media via. È il giudice con un bias <strong>costante</strong> che nessuno randomizza: quello non si media, si accumula.</p>
+
+<h2>Catastrophic forgetting</h2>
+
+<pre data-lab="lab_12_1"><code>                            prima     dopo     delta       IC 95% appaiato
+compito bersaglio         0.543    0.782    +0.239  [ +0.219,  +0.261]
+istruzioni generali       0.697    0.624    -0.073  [ -0.087,  -0.061]
+formato di uscita         0.734    0.730    -0.004  [ -0.007,  -0.001]</code></pre>
+
+<p>Il compito bersaglio migliora di 24 punti. Una capacità generale, che nessuno stava guardando, ne perde 7 — e l'intervallo appaiato non contiene lo zero: non è rumore del campione.</p>
+
+<p><strong>Prima e dopo sugli stessi esempi.</strong> È l'applicazione diretta di quello che hai appena misurato: se il «prima» e il «dopo» usassero due liste diverse, il delta mescolerebbe il cambiamento di abilità con la difficoltà del campione, e non sapresti quale dei due stai leggendo. Una sola lista per capacità, usata due volte, più l'intervallo appaiato della differenza.</p>
+
+<p>Se valuti solo il primo, dichiari un successo e spedisci una regressione. Ed è precisamente il tipo di risultato che poi si manifesta come «il modello fine-tuned è bravo sul suo compito ma è diventato strano».</p>
+
+<div class="note errore">
+  <div class="mark">La terza riga<br>è la più<br>istruttiva</div>
+  <div class="body">
+    <p>Il «formato di uscita» perde <strong>quattro decimi di punto</strong>, e anche il suo intervallo <em>esclude lo zero</em>. Il confronto appaiato è così sensibile che rileva un cambiamento di cui non ti importa nulla.</p>
+    <p><strong>«Statisticamente distinguibile da zero» non significa «rilevante».</strong> Sono due domande diverse, e la seconda non te la risponde nessun intervallo: devi decidere <em>prima</em> quale differenza minima conta per te. Un intervallo stretto attorno a un effetto minuscolo è il modo corretto di dire «qui non è successo niente che valga la pena», ed è un esito diverso — e più informativo — di un intervallo largo che copre lo zero.</p>
+  </div>
+</div>
+
+<div class="note nozione">
+  <div class="mark">Va deciso<br>prima</div>
+  <div class="body">
+    <p>Fissa due o tre capacità generali che il modello deve conservare, <strong>misurale prima</strong> del fine-tuning, rimisurale dopo.</p>
+    <p>Senza la misura <em>prima</em> non puoi dire niente <em>dopo</em>: non c'è modo di distinguere «peggiorato» da «non è mai stato bravo». È lo stesso principio del controllo di parità di M02, ed è il motivo per cui questo modulo precede quelli sull'addestramento.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Il tuo modello passa da 71,2% a 73,5% sull'insieme di valutazione. Puoi dire che è migliorato?</li>
+  <li>Perché valutare due modelli sugli stessi esempi dà un intervallo più stretto?</li>
+  <li>L'IC 95% della differenza è <code>[-0,01, +0,08]</code>. Cosa concludi?</li>
+  <li>Il tuo giudice preferisce il modello nuovo nel 54% dei confronti. Cosa devi controllare prima di crederci?</li>
+  <li>Vuoi rilevare differenze di 1 punto invece di 2. Quanti esempi in più, all'incirca?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Non da quei due numeri.</strong> Serve l'intervallo di confidenza sulla differenza. Nel lab, una differenza vera di 3,3 punti produceva differenze osservate fra −8 e +16 punti su campioni da 100.</p>
+    <p><strong>2.</strong> Perché gran parte del rumore viene dalla difficoltà degli item, non dai modelli. Sugli stessi item quella componente è comune ai due e si cancella nella differenza. Misurato: intervalli dall'11% al 19% più stretti a parità di esempi.</p>
+    <p><strong>3.</strong> <strong>Non hai dimostrato niente.</strong> L'intervallo contiene lo zero. Non significa «non c'è differenza»: significa che con questi dati non puoi distinguere fra nessuna differenza e una differenza fino a 8 punti.</p>
+    <p><strong>4.</strong> Che l'ordine di presentazione sia <strong>randomizzato</strong>, e che invertendolo il verdetto non cambi. Con ordine fisso, 5 punti di bias posizionale bastano a ribaltare un effetto da 2 punti.</p>
+    <p><strong>5.</strong> Circa <strong>quattro volte</strong> tanti: il costo cresce col quadrato della finezza.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

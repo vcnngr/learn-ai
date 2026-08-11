@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M15 — Fine-tuning riproducibile</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m15">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M15 · 10 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Fine-tuning riproducibile</h1>
+<p class="subtitle">La differenza fra un esperimento e un aneddoto. Se un run rende poco e non è riproducibile, non puoi cercarne la causa: puoi solo rifarlo diverso e sperare.</p>
+
+<p class="lede">Questo modulo non aggiunge una tecnica: aggiunge la <strong>condizione</strong> perché tutte le altre siano utilizzabili. Senza riproducibilità, la diagnosi del modulo finale è impossibile in linea di principio — non difficile, <em>impossibile</em>.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Lanci lo stesso addestramento due volte, sulla stessa macchina, con lo stesso codice e <code>torch.manual_seed(42)</code> all'inizio.</p>
+    <ol>
+      <li>I pesi finali saranno identici?</li>
+      <li>Se non lo sono, è perché «l'addestramento è intrinsecamente non deterministico»?</li>
+      <li>Quante sorgenti di casualità distinte ci sono in un ciclo di addestramento?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_15_1"><code>variante                              max|scarto| dai pesi base
+tutto identico                                     0.000000e+00
+stesso seme, seconda esecuzione                    0.000000e+00
+seme dei PESI diverso                              6.614567e-01
+ordine dei DATI diverso                            1.779752e-01</code></pre>
+    <p><strong>1. In questo lab sì, esattamente zero</strong> — le prime due righe sono <code>0.000000e+00</code>, non «piccolo»: identici. Ma è un risultato di <em>questo</em> ambiente: CPU, dtype e versioni fissati, e tutti i semi controllati.</p>
+    <p>Fuori di qui i semi da soli <strong>non bastano</strong>. Su GPU restano kernel non deterministici; e anche forzando le varianti deterministiche contano versione di libreria, hardware, backend e configurazione. Sono tre cose diverse: <em>semi controllati</em>, <em>algoritmi deterministici</em>, <em>equivalenza statistica</em> — e la sezione «Il determinismo completo costa» più avanti dice quale delle tre ti serve davvero.</p>
+    <p><strong>2. No.</strong> La riproducibilità non è un ideale irraggiungibile: è una proprietà che ottieni controllando gli ingressi.</p>
+    <p><strong>3. Almeno tre</strong>, gestite spesso da generatori <em>diversi</em>: l'inizializzazione dei pesi, l'ordine dei dati, il dropout. <code>torch.manual_seed()</code> non le copre necessariamente tutte.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 15.1<br>riproducibilità</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_15_1_riproducibile.py</code></pre>
+    <p>Isola e misura una sorgente di non-determinismo alla volta.</p>
+  </div>
+</div>
+
+<h2>L'errore più comune</h2>
+
+<pre data-lab="lab_15_1"><code>Fisso solo il seme dei pesi, lascio libero l'ordine dei dati:
+
+esecuzione               scarto dalla prima
+#1                             1.409658e-01
+#2                             1.671690e-01
+#3                             5.616406e-01</code></pre>
+
+<div class="note errore">
+  <div class="mark">Un seme<br>non basta</div>
+  <div class="body">
+    <p>Stesso <code>torch.manual_seed()</code>, risultati diversi. Chi vede questo di solito conclude che «l'addestramento è intrinsecamente non deterministico» e smette di provarci.</p>
+    <p><strong>Non lo è.</strong> L'ordine dei dati è una <em>seconda</em> sorgente di casualità, spesso gestita da un generatore diverso — quello del caricatore o del campionatore. Va fissato esplicitamente, e non è coperto dal seme globale.</p>
+    <p>La conseguenza pratica è seria: credi di avere un run deterministico, confronti due configurazioni, e attribuisci alla configurazione una differenza che era solo l'ordine degli esempi.</p>
+  </div>
+</div>
+
+<h2>Il manifest</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Un <strong>manifest</strong> è un file — non la memoria di chi ha lanciato il run — che contiene tutto ciò che serve a rifare l'esperimento. Il criterio per decidere se un campo ci va è uno solo: <em>se cambia questo, il risultato cambia?</em></p>
+  </div>
+</div>
+
+<pre data-lab="lab_15_1"><code>modello_base       {"nome": "org/modello", "revisione": "sha-esatto"}
+dataset            {"percorso": ..., "sha256": ..., "righe": ...}
+tokenizer          {"nome": ..., "revisione": ..., "chat_template_sha256": ...}
+adattatore         {"tipo": "lora", "r": 16, "alpha": 32, "target_modules": [...]}
+ottimizzazione     {"optimizer": "adamw", "lr": 1e-4, "scheduler": ..., "warmup": ...}
+batch              {"micro": 4, "accumulazioni": 8, "gpu": 2, "effettivo": 64}
+sequenza           {"max_len": 2048, "packing": false, "troncamento": "destra"}
+precisione         {"pesi": "bf16", "stati_optimizer": "fp32", "tf32": ...}
+semi               {"pesi": 0, "ordine_dati": 0, "dropout": 0}
+ambiente           {"python": ..., "torch": ..., "piattaforma": ..., "cuda": ...}
+loss               {"maschera": "solo_risposta", "ignore_index": -100}
+inferenza_eval     {"temperatura": 0.0, "max_new_tokens": 256, "template": ...}</code></pre>
+
+<p>Tre campi meritano attenzione perché sono quelli che nessuno registra, e sono esattamente quelli che poi rendono inspiegabile una differenza fra due run: <strong>lo sha del dataset</strong>, <strong>lo sha del chat template renderizzato</strong>, e <strong>il flag TF32</strong> (M05 — due macchine con lo stesso codice danno numeri diversi se differisce).</p>
+
+<h3>Perché l'impronta dei dati, non il percorso</h3>
+
+<pre data-lab="lab_15_1"><code>dataset originale                sha256 1c8896a9b9e81c66...  60 byte
+dopo una modifica invisibile     sha256 71db995b3a71c4e4...  61 byte</code></pre>
+
+<p>I due file differiscono di <strong>un carattere</strong> — uno spazio in fondo a una risposta. Le impronte sono completamente diverse.</p>
+
+<p><code>dati/train.jsonl</code> non identifica niente: il file cambia e il nome resta. L'impronta sì. È la differenza fra <em>«ho rifatto lo stesso esperimento»</em> e <em>«credo di aver rifatto lo stesso esperimento»</em>.</p>
+
+<h2>Il determinismo completo costa</h2>
+
+<p>Sui kernel GPU alcune operazioni non sono deterministiche: l'ordine delle riduzioni in parallelo varia, e due esecuzioni identiche differiscono di poco. Si possono forzare varianti deterministiche, ma alcune diventano più lente e altre <strong>sollevano un errore</strong> perché una variante deterministica non esiste.</p>
+
+<div class="note errore">
+  <div class="mark">Due casi<br>da non<br>confondere</div>
+  <div class="body">
+    <p><strong>Serve davvero</strong> quando fai un <em>controllo di parità</em> (M02): lì il rumore numerico si confonderebbe con il difetto che stai cercando. E quando insegui un bug che appare a intermittenza.</p>
+    <p><strong>Non serve</strong> per un addestramento di produzione. Ti basta poter rifare il run in modo <em>statisticamente equivalente</em>, non bit per bit: registri i semi e il manifest, e accetti lo scarto numerico residuo.</p>
+    <p>Confondere i due casi porta a pagare un rallentamento permanente per una garanzia che non ti serviva — o, peggio, a non attivarlo proprio quando serviva.</p>
+  </div>
+</div>
+
+<h2>La checklist</h2>
+
+<p>Otto voci, nessuna costa più di dieci minuti:</p>
+
+<ol>
+  <li>Il <strong>manifest è scritto su file</strong>, non nella memoria di chi lancia.</li>
+  <li><strong>sha256 del dataset</strong> registrato.</li>
+  <li><strong>Revisione esatta</strong> del modello base — non un riferimento mobile come <code>main</code>.</li>
+  <li><strong>Template renderizzato salvato come testo</strong>, non solo il suo nome.</li>
+  <li><strong>Semi fissati</strong>: pesi, ordine dei dati, dropout.</li>
+  <li><strong>Baseline misurata prima</strong> (M12), sullo stesso insieme di valutazione.</li>
+  <li><strong>Controllo di parità a passo zero</strong> eseguito (M02).</li>
+  <li><strong>Maschera della loss ispezionata</strong> token per token (M10).</li>
+</ol>
+
+<p>Le ultime tre sono quelle che questo corso ha aggiunto e che non compaiono nelle checklist standard. Sono anche quelle che intercettano i guasti silenziosi — quelli che non producono errori e si manifestano solo come «il modello rende meno del previsto».</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>solido</div>
+  <div class="body">
+    <p>È esattamente l'idea di build riproducibile: pin delle versioni, lockfile, immagine con digest invece che con tag mobile. Sai già perché <code>latest</code> è un problema.</p>
+    <p><strong>La differenza:</strong> in una build il non-determinismo è un difetto da eliminare. Qui è anche una <em>variabile sperimentale</em> — cambiare seme e rifare il run è un modo legittimo di misurare quanto della tua differenza è rumore. Un seme diverso non è un bug: è un campione in più.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Due run con lo stesso <code>manual_seed</code> danno pesi diversi. Prima ipotesi?</li>
+  <li>Perché registrare <code>sha256</code> del dataset e non il percorso?</li>
+  <li>Quando conviene attivare il determinismo completo, e quando è spreco?</li>
+  <li>Il manifest dice <code>modello_base: "org/modello"</code>. Cosa manca?</li>
+  <li>Un collega dice che il tuo run non è riproducibile perché «i float sono imprecisi». Cosa rispondi?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Che una <strong>seconda sorgente</strong> di casualità non è fissata — quasi sempre l'ordine dei dati, gestito da un generatore diverso. Nel lab, fissando entrambi lo scarto è esattamente <code>0.0</code>.</p>
+    <p><strong>2.</strong> Perché il percorso non identifica il contenuto: il file cambia e il nome resta. Nel lab, un solo carattere di differenza cambia completamente l'impronta.</p>
+    <p><strong>3.</strong> Serve per i <strong>controlli di parità</strong> e per i bug intermittenti, dove il rumore numerico si confonde col difetto. È spreco in produzione, dove basta l'equivalenza statistica.</p>
+    <p><strong>4.</strong> La <strong>revisione esatta</strong>. Un nome senza revisione è un riferimento mobile: fra due mesi punta a un modello diverso e il run non è più rifacibile.</p>
+    <p><strong>5.</strong> Che l'imprecisione dei float produce scarti dell'ordine di <code>10⁻⁷</code>, non risultati diversi. Nel lab due run con tutti i semi fissati danno <strong>zero esatto</strong>. Se i tuoi differiscono di più, non è la virgola mobile: è un ingresso che non hai controllato.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

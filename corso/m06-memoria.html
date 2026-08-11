@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M06 — Aritmetica della memoria</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m06">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M06 · 8 h · <span class="pill cpu">CPU · è solo aritmetica</span></p>
+<h1>Aritmetica della memoria</h1>
+<p class="subtitle">Il modulo che cambia il tuo rapporto con gli addestramenti: da «lancio e vedo» a «so già cosa succederà».</p>
+
+<p class="lede">Una GPU del profilo ha 141 GB. Un modello da 27 miliardi di parametri in bf16 ne occupa 54. Sembra che ci stia comodo. <strong>Non ci sta</strong>, e la differenza fra i due numeri è tutto questo modulo.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Modello denso da <strong>27 miliardi</strong> di parametri. Full fine-tuning, AdamW, pesi in bf16. Attivazioni escluse — solo quello che c'è sempre, indipendentemente dal batch.</p>
+    <ol>
+      <li>Elenca le <strong>voci</strong> che occupano memoria. Quante ne trovi?</li>
+      <li>Dai un numero in GB a ciascuna.</li>
+      <li>Totale?</li>
+      <li>Entra in una GPU da 141 GB? E usandone due?</li>
+    </ol>
+    <p>Sbilanciati. Anche a caso: serve lo scarto.</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_06_1"><code>voce                          GB   come si ottiene
+pesi (base)                 54.0   2.7e10 par x 2 byte (bf16)
+gradienti                   54.0   2.7e10 addestrabili x 2 byte
+stati optimizer            216.0   2.7e10 x 8 byte (AdamW, fp32)
+copia master fp32          108.0   2.7e10 x 4 byte (se l'impl. la tiene)
+---------------------- ---------
+STATICO totale             432.0   senza attivazioni</code></pre>
+    <p><strong>432 GB.</strong> Otto volte i pesi. Su una GPU da 141: non entra. Su due, nemmeno partizionando idealmente — <code>432 / 2 = 216</code> GB per GPU, ancora sopra il tetto.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La voce che sorprende quasi tutti è la terza. <strong>Gli stati dell'optimizer sono la voce più grande di tutte</strong>, quattro volte i pesi: AdamW tiene due momenti per parametro addestrabile, qui contati in <code>fp32</code> — 4+4 = 8 byte.</p>
+    <div class="note errore" style="margin-top:14px">
+      <div class="mark">Questa è UNA<br>configurazione,<br>non «AdamW»</div>
+      <div class="body">
+        <p>Gli 8 byte e la copia master descrivono una <strong>configurazione di mixed precision dichiarata</strong>, non una proprietà dell'algoritmo. In M08 il lab lo misura: chiedendo a PyTorch di usare AdamW su pesi <code>bf16</code>, gli stati nascono <code>bf16</code> — <strong>4 byte per parametro</strong>, e nessuna copia master automatica.</p>
+        <p>Quel conto darebbe <strong>216 GB invece di 432</strong>. Non è un dettaglio: è metà.</p>
+        <p>Quindi tutte le tabelle di questo modulo valgono <em>sotto le ipotesi scritte accanto</em>. Prima di usarle sul tuo caso, <strong>misura i byte per ruolo sul tuo stack</strong> col codice di M08. È il primo termine che va verificato, non assunto.</p>
+      </div>
+    </div>
+    <p>Se hai risposto «54 GB, quindi ci sta», hai fatto l'errore che questo modulo esiste per togliere: <strong>hai contato il modello, non l'addestramento</strong>.</p>
+  </div>
+</details>
+
+<h2>Le cinque voci</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <table style="margin:0">
+    <tr><th>Voce</th><th>Segue</th><th>Byte per parametro</th></tr>
+    <tr><td><strong>1. Pesi</strong></td><td>tutti i parametri</td><td>2 (bf16), 4 (fp32), ~0,5 (4 bit)</td></tr>
+    <tr><td><strong>2. Gradienti</strong></td><td><em>solo</em> gli addestrabili</td><td>2, stessa forma dei pesi</td></tr>
+    <tr><td><strong>3. Stati optimizer</strong></td><td><em>solo</em> gli addestrabili</td><td>8 (AdamW fp32), 2 (8-bit), 4 (SGD con momento)</td></tr>
+    <tr><td><strong>4. Copia master</strong></td><td><em>solo</em> gli addestrabili</td><td>4, <em>se</em> l'implementazione la tiene</td></tr>
+    <tr><td><strong>5. Attivazioni</strong></td><td>batch × sequenza</td><td>non per parametro — vedi sotto</td></tr>
+    </table>
+    <p style="margin-top:14px">Le prime quattro sono <strong>statiche</strong>: ci sono sempre, non dipendono dal batch. La quinta è l'unica che controlli senza cambiare metodo.</p>
+  </div>
+</div>
+
+<p><strong>La colonna «segue» è la chiave del modulo.</strong> Le voci 2, 3 e 4 non seguono <em>tutti</em> i parametri: seguono solo quelli <strong>addestrabili</strong>. È l'intera ragione per cui LoRA funziona — e non è, come si sente dire, che «LoRA usa meno memoria per i pesi». I pesi restano tutti lì.</p>
+
+<div class="note lab">
+  <div class="mark">Lab 06.1<br>calcolatore</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_06_1_memoria.py
+python3 corso/labs/lab_06_1_memoria.py --params 27e9 --method lora --optimizer adamw8bit</code></pre>
+    <p>Applica la formula, non misura niente. <strong>Fai il conto a mano prima</strong>: il valore del lab è nello scarto con la tua previsione, non nel numero.</p>
+  </div>
+</div>
+
+<h2>Dove va il risparmio</h2>
+
+<pre data-lab="lab_06_1"><code>                        pesi  gradienti  optimizer  master   TOTALE
+full fine-tuning        54.0       54.0      216.0   108.0    432.0
+LoRA (0.491% addestr.)  54.0        0.3        1.1     0.5     55.9
+QLoRA (base a 4 bit)    13.5        0.3        1.1     0.5     15.4</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Da dove viene<br>lo 0,491%</div>
+  <div class="body">
+    <p>Non è una frazione plausibile scelta a occhio: è la configurazione dell'adattatore del <strong>caso di studio</strong>, e la conti tu in M14. Tutti e sette i moduli a <code>r=32</code> su un denso da 27B fanno <strong>132 644 864</strong> parametri addestrabili, cioè lo <strong>0,491%</strong>.</p>
+    <p>Sta scritta in <code>assets/profilo.js</code> sotto <code>caso.lora</code>, e la stampa <code>lab_14_1_lora.py</code> in fondo alla tabella dei <code>target_modules</code>. Se cambi <code>r</code> o i moduli bersaglio la frazione cambia — <code>q,v</code> a <code>r=16</code>, il default più comune, è lo <strong>0,045%</strong>, dieci volte meno — e questa tabella va rifatta: <code>lab_06_1_memoria.py --lora-frac &lt;la tua&gt;</code>.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Leggi la<br>tabella bene</div>
+  <div class="body">
+    <p>Da 432 a 55,9 GB. Ma guarda <em>dove</em> è sparito il peso: la colonna «pesi» è <strong>identica</strong>, 54 GB in entrambi i casi. Il modello sta tutto in memoria comunque.</p>
+    <p>Sono crollate le altre tre colonne, perché seguono i parametri addestrabili — e con la configurazione LoRA del caso sono lo 0,491%. <strong>378 GB dei 432 erano roba dell'optimizer, non il modello.</strong></p>
+    <p>QLoRA aggiunge il pezzo mancante: quantizza anche la base, e attacca finalmente la colonna dei pesi (54 → 13,5).</p>
+    <p><strong>Nota sul 13,5:</strong> è calcolato con 0,5 byte per parametro, cioè i soli 4 bit. In M14 conterai anche le <em>scale</em> di quantizzazione, e con quel quantizzatore il totale sale a circa <strong>16,2 GB</strong>. La differenza non cambia la conclusione, ma cambia il numero: «4 bit» non significa mai esattamente mezzo byte.</p>
+    <p><strong>Conseguenza pratica per te:</strong> se sei al limite di memoria con LoRA, ridurre il <code>rank</code> non ti salverà — quei GB non sono nel rank. Devi agire sulla base (quantizzarla) o sulle attivazioni (batch, sequenza, checkpointing).</p>
+  </div>
+</div>
+
+<h3>Lo stesso conto, sul tuo hardware</h3>
+
+<p>Tutto quello che hai letto finora è un <strong>caso svolto</strong>: 27B su due schede da 141 GB. Il metodo è tuo, quei numeri no. Qui sotto lo stesso conto rifatto sui campi di <code>assets/profilo.js</code> — e se il tuo regime è diverso, cambia anche <em>quale domanda</em> ha senso porsi.</p>
+
+<div data-conto="full"></div>
+
+<p>E con LoRA, che è poi la configurazione del caso di studio:</p>
+
+<div data-conto="lora"></div>
+
+<div class="note errore">
+  <div class="mark">Questi due<br>blocchi non<br>sono verificati<br>dal gate</div>
+  <div class="body">
+    <p>Le tabelle statiche di questa pagina passano da <code>verifica.py</code>: ogni numero è confrontato con l'output di <code>lab_06_1_memoria.py</code>. I due blocchi qui sopra no — sono calcolati nel tuo browser, e il gate non può vederli.</p>
+    <p>La garanzia che li tiene in piedi è un'altra, ed è dichiarata: <code>tools/parity_conti.py</code> verifica che <code>conti.js</code> e <code>lab_06_1_memoria.py</code> producano <strong>gli stessi byte</strong> su otto configurazioni diverse, con uguaglianza esatta. Se un giorno divergessero, il controllo fallisce e il rilascio si ferma.</p>
+    <p>È la stessa struttura del controllo di parità di M02, applicata al corso invece che a un adattatore: due strade per la stessa funzione, esito binario.</p>
+  </div>
+</div>
+
+<h2>Il conto si fa per GPU</h2>
+
+<div class="note errore">
+  <div class="mark">L'errore che<br>ti aspetta</div>
+  <div class="body">
+    <p><strong>Non hai 282 GB.</strong> Hai due volte 141 GB, separate. NVLink rende velocissimo lo scambio fra le due schede — non le fonde in un unico spazio di indirizzamento.</p>
+    <p>Quanto sta su una singola GPU dipende interamente dalla strategia:</p>
+    <ul>
+      <li><strong>DDP</strong> replica <em>tutto</em> su ogni GPU. Due GPU non ti danno un byte in più: ti danno il doppio del throughput. Se non entra su una, non entra.</li>
+      <li><strong>ZeRO / FSDP</strong> partiziona: a seconda dello stadio, gli stati dell'optimizer, i gradienti, i pesi. <em>Quello</em> riduce la memoria per GPU, al costo di comunicazione.</li>
+    </ul>
+    <p>È il riflesso più costoso che porti dall'infrastruttura, dove sommare le risorse di un pool è corretto. Qui la somma non esiste finché non scegli come partizionare — ed è M18.</p>
+  </div>
+</div>
+
+<h2>Le attivazioni</h2>
+
+<p>Sono l'unica voce che dipende da come <em>usi</em> il modello, non da cos'è. Vengono da M02: per calcolare <code>∂L/∂W</code> serve l'ingresso di ogni strato, quindi ogni strato trattiene il suo.</p>
+
+<pre data-lab="lab_06_1"><code>attivazioni ~ batch × seq_len × hidden × n_layer × k × byte
+
+Esempio, hidden=5120, layers=46, bf16, k=10:
+
+ batch     seq   GB attivazioni
+     1    2048              9.6
+     1    8192             38.6
+     4    2048             38.6
+     4    8192            154.4
+     8    2048             77.2
+     8    8192            308.7</code></pre>
+
+<div class="note errore">
+  <div class="mark">Attenzione<br>a questa stima</div>
+  <div class="body">
+    <p><strong><code>k</code> non è una costante universale.</strong> Dipende dall'architettura e da quante uscite intermedie ogni strato trattiene davvero — che cambia con i kernel fusi e con la versione della libreria. Il 10 qui sopra è una stima, non un valore da citare.</p>
+    <p>Quindi questa formula dà un <strong>ordine di grandezza</strong>, non un numero su cui fare affidamento. Serve a vedere il <em>comportamento</em>: raddoppia il batch e raddoppia, raddoppia la sequenza e raddoppia. Il numero vero lo misuri in M07, e lo scarto fra i due è l'informazione utile.</p>
+  </div>
+</div>
+
+<p>Guarda l'ultima riga: <strong>308,7 GB di sole attivazioni</strong>, contro 55,9 GB di statico per il LoRA. A sequenze lunghe e batch grande, le attivazioni <em>dominano</em> tutto il resto. È il motivo per cui il gradient checkpointing esiste, e perché la lunghezza di sequenza è un iperparametro di memoria prima che di qualità.</p>
+
+<h2>I quattro errori che rendono il conto inutile</h2>
+
+<ol>
+  <li><strong>Sommare le GPU.</strong> Il conto è per GPU. Cosa sta dove lo decide la strategia.</li>
+  <li><strong>Contare tutto nello stesso dtype.</strong> «Training in bf16» descrive i pesi; gli stati dell'optimizer sono tipicamente fp32. Chi conta 4 byte invece di 8 sbaglia la voce più grande di tutte.</li>
+  <li><strong>Dare i gradienti a tutti i parametri.</strong> Con LoRA la base è congelata: niente gradienti, niente stati.</li>
+  <li><strong>Dimenticare che la formula sottostima.</strong> Mancano sempre: workspace temporanei dei kernel, frammentazione dell'allocatore, buffer di comunicazione, e i <strong>logit</strong> — <code>batch × seq × vocabolario</code>, che con un vocabolario da 128 000 voci non è affatto trascurabile.</li>
+</ol>
+
+<p style="font-size:1.05rem"><strong>Regola pratica: se il conto dice che ci stai per un pelo, non ci stai.</strong></p>
+
+<h2>Il tetto non è duro</h2>
+
+<p>Hai <strong>1 TB di RAM</strong> e NVMe locale. Stati dell'optimizer e pesi possono essere spostati fuori dalla GPU e richiamati quando servono — è l'<em>offload</em>. I 432 GB del full fine-tuning non entrano in HBM, ma entrano in 1 TB di RAM.</p>
+
+<p>Il prezzo è il tempo: ogni passo deve muovere decine di GB avanti e indietro su PCIe, e un addestramento può diventare dieci volte più lento. Spesso inaccettabile — ma <strong>«non risiede in HBM» non è la stessa cosa di «impossibile»</strong>, e conoscere la differenza cambia quali opzioni hai davanti.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Modello da 8B, full FT, AdamW, bf16, con copia master. Statico totale?</li>
+  <li>Stesso modello con LoRA all'1% di parametri addestrabili. Statico totale? Quale voce non è cambiata?</li>
+  <li>Sei a 138 GB su 141 con LoRA e vai in errore di memoria. Ridurre il rank da 64 a 16 ti salva? Perché?</li>
+  <li>DDP su due GPU raddoppia la memoria disponibile per il modello?</li>
+  <li>Il tuo conto dà 120 GB e l'addestramento va in errore a 141. Elenca tre voci che la formula non contava.</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Pesi <code>8e9×2 = 16</code>, gradienti <code>16</code>, optimizer <code>8e9×8 = 64</code>, master <code>8e9×4 = 32</code>. Totale <strong>128 GB</strong>. Su una GPU da 141 entra a malapena — e senza attivazioni, quindi in pratica no.</p>
+    <p><strong>2.</strong> Addestrabili <code>8e7</code>. Pesi <strong>16 GB</strong> (invariati), gradienti 0,16, optimizer 0,64, master 0,32. Totale <strong>≈ 17,1 GB</strong>. <strong>La voce «pesi» non è cambiata:</strong> il modello sta tutto in memoria comunque.</p>
+    <p><strong>3.</strong> <strong>No.</strong> Con LoRA le voci legate al rank valgono pochi GB in tutto: dimezzarle non recupera i 3 GB che ti mancano in modo affidabile. I GB stanno nei pesi base e nelle attivazioni. Agisci lì: quantizza la base, riduci batch o lunghezza di sequenza, attiva il gradient checkpointing.</p>
+    <p><strong>4.</strong> <strong>No.</strong> DDP replica tutto su entrambe: stessa memoria per GPU, doppio throughput. Per ridurre la memoria per GPU serve partizionare (ZeRO/FSDP).</p>
+    <p><strong>5.</strong> Fra le altre: workspace temporanei dei kernel, frammentazione dell'allocatore, buffer di comunicazione, i logit (<code>batch × seq × vocabolario</code>), i buffer della loss. Ed è il motivo per cui «ci sto per un pelo» significa «non ci sto».</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/conti.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

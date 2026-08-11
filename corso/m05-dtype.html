@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M05 — Byte, dtype e precisione</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m05">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M05 · 5 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Byte, dtype e precisione</h1>
+<p class="subtitle">Due byte non sono due byte. Come li spendi decide se il tuo addestramento sopravvive.</p>
+
+<p class="lede">Serve a M06: per calcolare se un addestramento entra in memoria devi sapere quanti byte costa un numero, e <em>in quale ruolo</em>. Ma la parte interessante non è il conto — è che due tipi della stessa dimensione si rompono in modi opposti.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p><code>float16</code> e <code>bfloat16</code> occupano <strong>entrambi 2 byte</strong>.</p>
+    <ol>
+      <li>Se occupano lo stesso spazio, perché esistono tutti e due?</li>
+      <li>Quale dei due sceglieresti per addestrare, e in base a cosa?</li>
+      <li>Sommo centomila volte il numero <code>0,001</code>. Il risultato esatto è 100. Cosa ottengo accumulando in <code>bfloat16</code>? Circa 100? Qualcosa come 98? Prova a sbilanciarti.</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Perché spendono i loro 16 bit in modo <strong>opposto</strong>. Un numero in virgola mobile ha tre parti: segno, esponente (quanto grande o piccolo puoi essere — il <em>range</em>) e mantissa (quante cifre significative — la <em>precisione</em>).</p>
+    <pre style="margin:10px 0"><code>    dtype  byte  segno  esponente  mantissa
+  float32     4      1          8        23
+ bfloat16     2      1          8         7     ← range di fp32, precisione tagliata
+  float16     2      1          5        10     ← più preciso, range molto ridotto</code></pre>
+    <p><code>bfloat16</code> è <code>float32</code> con la coda tagliata: stesso esponente, stesso range. <code>float16</code> sacrifica il range per tenere più cifre.</p>
+    <p><strong>2.</strong> Per addestrare, <code>bfloat16</code> — ma la ragione conta più della risposta, e arriva fra due sezioni.</p>
+    <p><strong>3.</strong> <strong>Ottieni <code>0,5</code>.</strong> Non 100, non 98: <strong>zero virgola cinque</strong>, un errore del 99,5%. Se ti sembra impossibile, sei nel posto giusto — è la sezione più importante di questa pagina.</p>
+  </div>
+</details>
+
+<h2>Range contro precisione, misurati</h2>
+
+<div class="note lab">
+  <div class="mark">Lab 05.1<br>dtype</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_05_1_dtype.py</code></pre>
+  </div>
+</div>
+
+<pre data-lab="lab_05_1"><code>    dtype     valore max    min normale          eps
+  float32      3.403e+38      1.175e-38    1.192e-07
+ bfloat16       3.39e+38      1.175e-38     0.007812
+  float16        6.55e+04      6.104e-05    0.0009766</code></pre>
+
+<p><code>eps</code> è il più piccolo passo relativo rappresentabile: quanto devi cambiare un numero perché il tipo se ne accorga.</p>
+
+<p>Leggi la tabella per righe e vedi il baratto. <code>bfloat16</code> arriva a <strong>3,4·10³⁸</strong> come <code>float32</code>, ma con un <code>eps</code> di <strong>0,0078</strong> — esattamente 8 volte più grossolano di <code>float16</code>. E <code>float16</code> si ferma a <strong>65 504</strong>: oltre, non c'è più niente.</p>
+
+<h2>Perché bf16 ha vinto nel training</h2>
+
+<pre data-lab="lab_05_1"><code>  valore     float32      bfloat16      float16
+   1e+04       1e+04          9984        1e+04
+   6e+04     6.5e+04     6.502e+04    6.499e+04
+   1e+05       1e+05     9.984e+04          inf   ←
+   1e+08       1e+08     1.001e+08          inf
+   1e+30       1e+30         1e+30          inf</code></pre>
+
+<p>Guarda la colonna <code>bfloat16</code> prima di quella <code>float16</code>: <code>10 000</code> diventa <strong><code>9 984</code></strong>. Bf16 non rappresenta esattamente nemmeno un numero tondo di quattro cifre — è la precisione tagliata, in azione. Ma arriva fino a <code>1e+30</code> senza battere ciglio.</p>
+
+<p>Ora la colonna <code>float16</code>: è più preciso di bf16 fin dove arriva, e poi finisce di colpo.</p>
+
+<div class="note errore">
+  <div class="mark">Il meccanismo,<br>non lo slogan</div>
+  <div class="body">
+    <p>Durante il calcolo all'indietro i gradienti attraversano decine di moltiplicazioni — è la regola della catena di M02, e i prodotti possono crescere. Se un valore intermedio supera <strong>65 504</strong>, in <code>float16</code> diventa <code>inf</code>, e da lì ogni operazione successiva produce <code>NaN</code>. Il run è perso, spesso dopo ore.</p>
+    <p>In <code>bfloat16</code> quel tetto è a <code>3,4·10³⁸</code>: praticamente irraggiungibile.</p>
+    <p><strong>Ma il tetto non è l'unico problema, e qui va fatta una distinzione che si sbaglia spesso.</strong> Il range ridotto di <code>float16</code> stringe da <em>due</em> lati:</p>
+    <ul>
+      <li><strong>Overflow</strong> in alto, a 65 504: un valore troppo grande diventa <code>inf</code>.</li>
+      <li><strong>Underflow</strong> in basso, sotto circa <code>6·10⁻⁵</code>: un gradiente troppo <em>piccolo</em> diventa <strong>zero</strong>, e quel peso semplicemente non riceve aggiornamento.</li>
+    </ul>
+    <p>Il <em>loss scaling</em> — moltiplicare la loss per un fattore grande prima del backward e dividere dopo — serve contro l'<strong>underflow</strong>: alza tutti i gradienti portandoli sopra la soglia in cui diventerebbero zero. <strong>Non risolve l'overflow: lo peggiora</strong>, perché moltiplicando li rende tutti più grandi.</p>
+    <p>L'overflow lo gestisce un meccanismo diverso, il <em>controllo dinamico della scala</em>: quando rileva un <code>inf</code> o un <code>NaN</code>, scarta quel passo e <em>abbassa</em> il fattore. Le due cose lavorano insieme, in direzioni opposte, cercando il fattore più alto che non fa traboccare.</p>
+    <p>Con <code>bfloat16</code> l'esponente è quello di <code>fp32</code> e questa impalcatura spesso non serve — ma dipende dallo stack numerico, non è una garanzia.</p>
+    <p><strong>Quindi la formulazione corretta non è «bf16 è migliore».</strong> È: <em>bf16 ha barattato precisione per range, e nell'addestramento il range conta più della precisione</em> — perché quello che deve essere giusto è la direzione dell'aggiornamento, non la sua terza cifra decimale. In altri contesti il baratto opposto è quello giusto.</p>
+  </div>
+</div>
+
+<h2>Dove la bassa precisione si rompe davvero</h2>
+
+<p>Non nei pesi. Nelle <strong>somme</strong>.</p>
+
+<pre data-lab="lab_05_1"><code>Sommo 100.000 volte il valore 0.001. Risultato esatto: 100.0
+
+  accumulatore      risultato       errore
+       float32        99.9567          0.0%
+      bfloat16         0.5000         99.5%
+       float16         4.0000         96.0%</code></pre>
+
+<div class="note errore">
+  <div class="mark">Il meccanismo</div>
+  <div class="body">
+    <p>Quando l'accumulatore diventa grande rispetto al passo, sommare il passo <strong>non cambia più nulla</strong>: il risultato viene arrotondato allo stesso valore di prima. L'accumulo si ferma e resta bloccato lì, per sempre.</p>
+    <p>In <code>bfloat16</code> succede a <code>0,5</code>: con <code>eps ≈ 0,0078</code>, il passo <code>0,001</code> è troppo piccolo per spostare un accumulatore di quella grandezza. Da quel momento in poi hai sommato centomila volte a vuoto.</p>
+    <p><strong>Nota che non c'è nessun errore, nessun <code>inf</code>, nessun <code>NaN</code>.</strong> Solo un numero pulito e completamente sbagliato. È la stessa famiglia di guasti del broadcasting in M01: silenziosi.</p>
+  </div>
+</div>
+
+<div class="note nozione">
+  <div class="mark">Conseguenza<br>per M06</div>
+  <div class="body">
+    <p>Ecco perché <strong>«addestramento in bf16» non significa che tutto sia in bf16</strong>. Le riduzioni — somme, medie, norme dei gradienti — e gli stati dell'optimizer si tengono quasi sempre in <code>fp32</code>, proprio perché sono accumulatori.</p>
+    <p>Quando in M06 conterai i byte, dovrai contarli <strong>per ruolo</strong>: i pesi possono essere a 2 byte e i momenti dell'optimizer a 4, nello stesso addestramento. Chi conta «tutto a 2 byte» sbaglia il totale di parecchio.</p>
+  </div>
+</div>
+
+<h2>TF32 non è un tipo</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p><strong>TF32 è una modalità di calcolo, non un formato di memorizzazione.</strong> I valori restano <code>fp32</code> in memoria; è la moltiplicazione dentro i Tensor Core a usare una mantissa ridotta. Non cambia quanti byte occupa un tensore, e non troverai mai un tensore «di tipo tf32».</p>
+    <p>È un interruttore. Come si chiami e se sia attivo per default dipende dalla versione: verificalo sul tuo stack invece di fidarti di questa pagina.</p>
+    <pre style="margin:10px 0"><code>torch.backends.cuda.matmul.allow_tf32
+torch.backends.cudnn.allow_tf32</code></pre>
+    <p><strong>Perché ti riguarda in diagnosi:</strong> due macchine con lo stesso codice e lo stesso dtype danno numeri leggermente diversi se questo interruttore differisce. È una delle cause di un controllo di parità (M02) che fallisce di poco senza motivo apparente.</p>
+  </div>
+</div>
+
+<h2>Le tre distinzioni da tenere separate</h2>
+
+<table>
+<tr><th>Cosa</th><th>Significa</th><th>Esempio</th></tr>
+<tr><td><strong>Storage dtype</strong></td><td>Quanti byte occupa il numero in memoria</td><td><code>bf16</code> = 2 byte per parametro</td></tr>
+<tr><td><strong>Compute format</strong></td><td>Con che precisione avviene la moltiplicazione</td><td>TF32 su ingressi fp32</td></tr>
+<tr><td><strong>Accumulator dtype</strong></td><td>In che tipo si sommano i risultati parziali</td><td>fp32 anche con ingressi bf16</td></tr>
+</table>
+
+<p>Tenerle separate è ciò che ti permetterà, in M06, di scrivere un conto di memoria che torna. Confonderle è il modo più comune di sbagliarlo.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Contro quale dei due guasti — overflow o underflow — serve il loss scaling? E l'altro chi lo gestisce?</li>
+  <li>Un tensore da 27·10⁹ parametri: quanti GB in fp32, bf16, fp8?</li>
+  <li>Sommi un milione di valori piccoli in bf16 e il totale si blocca. Cos'è successo, e come lo risolvi?</li>
+  <li>Attivare TF32 riduce la memoria occupata da un modello? Perché?</li>
+  <li>Un collega dice «il training è tutto in bf16, quindi ogni numero costa 2 byte». Dove sbaglia?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Attenzione alla direzione: il loss scaling serve contro l'<strong>underflow</strong> — gradienti così piccoli da arrotondarsi a zero sotto <code>6·10⁻⁵</code>. Moltiplicare la loss li alza sopra la soglia. L'<em>overflow</em> a 65 504 è il problema opposto, e il loss scaling lo peggiora: lo gestisce il controllo dinamico della scala, che abbassa il fattore quando rileva <code>inf</code>. <code>bfloat16</code>, avendo l'esponente di <code>fp32</code>, spesso rende superflua tutta l'impalcatura.</p>
+    <p><strong>2.</strong> fp32: <code>27·10⁹ × 4 = 108 GB</code>. bf16: <code>54 GB</code>. fp8: <code>27 GB</code>. Solo i pesi, senza nient'altro — e una GPU del profilo ne ha 141.</p>
+    <p><strong>3.</strong> L'accumulatore è diventato grande rispetto al passo, e il passo viene arrotondato via: sommare non cambia più nulla. Si risolve accumulando in <code>fp32</code> anche se gli addendi sono in <code>bf16</code>.</p>
+    <p><strong>4.</strong> <strong>No.</strong> È una modalità di calcolo, non un formato di memorizzazione: i tensori restano <code>fp32</code> e occupano gli stessi byte. Cambia la velocità, non lo spazio.</p>
+    <p><strong>5.</strong> Sbaglia perché «training in bf16» descrive i <em>pesi</em>. Gli stati dell'optimizer, l'eventuale copia master e le riduzioni stanno tipicamente in <code>fp32</code> — proprio perché sono accumulatori, e in bf16 si bloccherebbero. Contare tutto a 2 byte sottostima il totale in modo grave.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

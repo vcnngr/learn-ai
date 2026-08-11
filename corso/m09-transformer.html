@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M09 — Architettura del transformer</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m09">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M09 · 12 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Architettura del transformer</h1>
+<p class="subtitle">Lo scrivi tu, riga per riga, e ogni pezzo viene confrontato numericamente con l'implementazione di riferimento.</p>
+
+<p class="lede">Il modulo più lungo, e l'unico dove il risultato non è «hai capito» ma <strong><code>max|diff| = 1.192e-07 → OK</code></strong>. Un'implementazione o coincide col riferimento o no: non c'è una via di mezzo in cui hai capito abbastanza.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>La formula dell'attention è <code>softmax(Q Kᵀ / √d) V</code>.</p>
+    <ol>
+      <li>A cosa serve la divisione per <code>√d</code>? Cosa succederebbe togliendola?</li>
+      <li><code>Q</code> ha forma <code>[batch, teste, seq, d]</code>. Che forma ha <code>Q Kᵀ</code>, e perché quel numero è il vero problema di memoria delle sequenze lunghe?</li>
+      <li>Se ogni token può guardare tutti gli altri, cosa impedisce a un token di leggere la risposta che deve prevedere?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> Non è cosmetica. Senza, la deviazione standard dei punteggi cresce come <code>√d</code>, misurato:</p>
+    <pre data-lab="lab_09_1"><code>     d  std SENZA /sqrt(d)     CON   max softmax
+     8               2.67     0.95        0.9468
+    64               8.00     1.00        1.0000
+   512              22.66     1.00        1.0000
+  4096              64.42     1.01        1.0000</code></pre>
+    <p>A <code>d</code> grande il softmax diventa un massimo secco: un token prende peso ≈1 e gli altri ≈0. E <strong>il gradiente attraverso un softmax saturo è quasi nullo</strong> — quello strato smette di imparare. La divisione tiene la deviazione a 1 indipendentemente da <code>d</code>.</p>
+    <p><strong>2.</strong> <code>[batch, teste, seq, seq]</code>. Cresce col <strong>quadrato</strong> della sequenza: è il termine che hai già misurato in M07, ed è il motivo per cui raddoppiare la sequenza non costa come raddoppiare il batch.</p>
+    <p><strong>3.</strong> La <strong>maschera causale</strong>. Senza, ogni token vedrebbe il proprio bersaglio e la loss crollerebbe — il caso «loss troppo bassa» di M02.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 09.1<br>transformer</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_09_1_transformer.py</code></pre>
+    <p>Otto sezioni. Ogni pezzo che scrivi viene confrontato con PyTorch e il lab dichiara <code>OK</code> o <code>DIVERSO</code>.</p>
+  </div>
+</div>
+
+<h2>Attention</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <pre style="margin:10px 0"><code>punteggi = Q @ K.T / √d        quanto ogni token guarda ogni altro
+pesi     = softmax(punteggi)   normalizzati a 1 per riga
+uscita   = pesi @ V            media pesata dei valori</code></pre>
+    <p>Tre righe. Tutto il resto dell'architettura è impalcatura intorno a questo.</p>
+  </div>
+</div>
+
+<pre data-lab="lab_09_1"><code>attention piena   vs  F.scaled_dot_product_attention   max|diff| = 1.192e-07   OK
+attention causale vs  ... (is_causal=True)             max|diff| = 1.192e-07   OK</code></pre>
+
+<p><code>1,2·10⁻⁷</code> è il rumore di <code>float32</code>: le due implementazioni fanno le stesse operazioni in ordine leggermente diverso. <strong>Questo è il livello a cui deve stare una verifica</strong> — non «il risultato sembra ragionevole», ma uno scarto dell'ordine della precisione numerica.</p>
+
+<h3>La maschera causale</h3>
+
+<pre data-lab="lab_09_1"><code>        k0  k1  k2  k3  k4          pesi risultanti (righe = query)
+    q0  .   X   X   X   X            1.00  0.00  0.00  0.00  0.00
+    q1  .   .   X   X   X            0.30  0.70  0.00  0.00  0.00
+    q2  .   .   .   X   X            0.09  0.15  0.76  0.00  0.00
+    q3  .   .   .   .   X            0.21  0.08  0.13  0.59  0.00
+    q4  .   .   .   .   .            0.06  0.09  0.71  0.05  0.09</code></pre>
+
+<p>Triangolo superiore esattamente zero, ogni riga somma a 1. Il token <code>i</code> non vede i successivi.</p>
+
+<div class="note errore">
+  <div class="mark">Perché ti<br>riguarda</div>
+  <div class="body">
+    <p>La maschera causale è ciò che rende sensato addestrare su tutta la sequenza in una sola passata: ogni posizione predice la successiva senza averla vista. È il motivo per cui un addestramento su 2048 token produce 2047 esempi in un colpo solo, invece di uno.</p>
+    <p>Se la maschera è sbagliata — o assente — <strong>ogni token vede il proprio bersaglio</strong>, la loss crolla vicino a zero e il modello non impara niente di utile. Il sintomo lo conosci da M02: loss iniziale molto sotto quella attesa. È una delle prime cose da escludere in M21.</p>
+  </div>
+</div>
+
+<h2>GQA, contato</h2>
+
+<pre data-lab="lab_09_1"><code>hidden=1024, teste query=32
+
+ kv_heads  q per gruppo      par K+V    vs MHA   KV cache/token
+       32             1    2,097,152    100.0%         4,096 B
+        8             4      524,288     25.0%         1,024 B
+        4             8      262,144     12.5%           512 B
+        1            32       65,536      3.1%           128 B</code></pre>
+
+<p><code>32</code> teste key/value è l'attention classica a teste multiple; <code>1</code> è Multi-Query Attention; i valori intermedi sono Grouped-Query.</p>
+
+<div class="note errore">
+  <div class="mark">Cosa si<br>risparmia<br>davvero</div>
+  <div class="body">
+    <p>Il risparmio sui <strong>parametri</strong> è reale ma modesto sul totale del modello: K e V sono due delle sette matrici di ogni strato. Il risparmio grosso è la <strong>KV cache in inferenza</strong>, che scala con <code>kv_heads × lunghezza × batch</code> — da 4 096 a 128 byte per token, un fattore 32.</p>
+    <p><strong>Su Q non si risparmia niente:</strong> resta a dimensione piena. Se ti aspetti che GQA riduca il costo dell'attention in addestramento, la sorpresa è che riduce poco. È nato per l'inferenza.</p>
+  </div>
+</div>
+
+<p>La verifica che conta: <code>GQA (4 teste q, 2 kv) vs riferimento → max|diff| = 1.192e-07 OK</code>. Ripetere le teste key/value e fare attention normale dà lo stesso risultato del percorso ottimizzato — GQA è <em>esattamente</em> quello, non un'approssimazione.</p>
+
+<h2>RoPE</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>RoPE codifica la posizione <strong>ruotando</strong> i vettori di un angolo proporzionale alla posizione, invece di sommare un vettore posizionale.</p>
+    <p>Prendi due vettori <code>a</code> e <code>b</code>, ruotali alle posizioni <code>m</code> e <code>n</code>, e fai il prodotto scalare. <strong>Da cosa dipende il risultato?</strong> Da <code>m</code>? Da <code>n</code>? Da entrambi? Da qualcos'altro?</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_09_1"><code>   m    n   m-n   prodotto scalare
+   0    0     0           0.266626
+   5    5     0           0.266625
+ 100  100     0           0.266625
+   3    1     2           1.964770
+   7    5     2           1.964770
+ 101   99     2           1.964768
+   1    3    -2           3.438553</code></pre>
+    <p><strong>Dipende solo dalla differenza <code>m − n</code>.</strong> Le posizioni 0 e 0, 5 e 5, 100 e 100 danno lo stesso identico valore. Così 3-1, 7-5, 101-99.</p>
+    <p>È questo che si intende con «RoPE codifica la posizione relativa»: non c'è nessun vettore di posizione sommato da qualche parte — c'è una rotazione il cui effetto sul prodotto scalare <em>emerge</em> come funzione della sola distanza.</p>
+    <p><strong>Dettaglio che conta:</strong> <code>(1,3)</code> dà un valore <em>diverso</em> da <code>(3,1)</code>. La proprietà è «funzione di <code>m − n</code>», non «di <code>|m − n|</code>»: il modello distingue prima da dopo.</p>
+  </div>
+</details>
+
+<div class="note errore">
+  <div class="mark">Cosa NON<br>segue da qui</div>
+  <div class="body">
+    <p>Che il modello funzioni oltre la lunghezza su cui è stato addestrato. La formula si <em>valuta</em> a qualunque posizione — nessun errore, nessun limite tecnico — ma le rotazioni a frequenze mai viste in addestramento producono configurazioni fuori distribuzione.</p>
+    <p><strong>RoPE è un meccanismo posizionale, non un metodo di estensione del contesto.</strong> Estendere richiede interventi espliciti (interpolazione delle frequenze, riaddestramento) e il risultato va <em>misurato</em>, non assunto — un modello può accettare 128k token in ingresso e degradare completamente oltre i 16k su cui è stato addestrato.</p>
+  </div>
+</div>
+
+<h2>RMSNorm</h2>
+
+<pre data-lab="lab_09_1"><code>mia RMSNorm  vs  F.rms_norm             max|diff| = 0.000e+00   OK
+
+media dopo LayerNorm  -2.02e-09   (centra: media → 0)
+media dopo RMSNorm    -2.98e-02   (NON centra)
+norma quadratica media dopo RMSNorm: 1.0000  (→ 1)</code></pre>
+
+<p><strong>Differenza esattamente zero</strong>, non approssimata: stessa sequenza di operazioni.</p>
+
+<p>RMSNorm normalizza solo la <em>scala</em>, non sottrae la media — e infatti la media dopo RMSNorm non è zero. Meno operazioni, nessun parametro di bias. Per tensore la differenza è piccola; moltiplicata per decine di strati e milioni di passi, non lo è.</p>
+
+<h2>L'MLP, e perché tre matrici</h2>
+
+<pre data-lab="lab_09_1"><code>gate = silu(x @ Wg)      fa da interruttore
+up   = x @ Wu            il segnale
+down = (gate * up) @ Wd  ritorno alla dimensione del modello
+
+frazione di gate negativi: 0.507
+8/3 × H = 170,  invece di 4 × H = 256</code></pre>
+
+<p>Un MLP classico ha due matrici e un'attivazione in mezzo. SwiGLU ne ha <strong>tre</strong>: una produce un segnale, un'altra un interruttore che lo modula, la terza riporta alla dimensione del modello. Per non aumentare i parametri si riduce la dimensione intermedia — tipicamente a circa <code>8/3 × hidden</code> invece di <code>4 × hidden</code>.</p>
+
+<p>Questo spiega i tre tensori <code>gate_proj</code>, <code>up_proj</code>, <code>down_proj</code> che hai visto in M04 e ti eri limitato ad accettare.</p>
+
+<h2>Il blocco completo</h2>
+
+<pre data-lab="lab_09_1"><code>blocco intero con la MIA attention vs quella di riferimento
+                                        max|diff| = 1.192e-07   OK
+
+parametri del blocco: 49,152
+  attention (4 matrici h × h)     16,384   33.3%
+  MLP (3 matrici)                 32,640   66.4%
+  norme (2 vettori)                  128    0.3%</code></pre>
+
+<div class="note errore">
+  <div class="mark">Le percentuali<br>non si trasferiscono</div>
+  <div class="body">
+    <p>In M04 avevi misurato su un checkpoint vero, per strato: <strong>attention 23,7%, MLP 76,3%</strong>. Qui: <strong>33,3% e 66,4%</strong>. L'MLP domina in entrambi, ma non nella stessa proporzione.</p>
+    <p>Il motivo è preciso: <strong>quel checkpoint usa GQA</strong> (8 teste query, 2 key/value), quindi K e V sono ridotte; questo blocco no, e le sue quattro matrici di attention sono tutte a dimensione piena.</p>
+    <p>Non è un dettaglio contabile. È un promemoria che vale per tutto il corso: <strong>una percentuale misurata su un modello non si trasferisce a un altro</strong> senza controllare che le scelte architetturali coincidano. Vale per le quote di parametri come per il <code>k</code> delle attivazioni di M07.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Togli la divisione per <code>√d</code> con <code>d = 4096</code>. Cosa succede ai pesi di attention, e perché lo strato smette di imparare?</li>
+  <li><code>q_proj</code> è <code>[4096, 4096]</code>, <code>k_proj</code> è <code>[512, 4096]</code>. Quante teste query per gruppo, e cosa si risparmia?</li>
+  <li>Il prodotto scalare dopo RoPE a posizioni <code>(50, 30)</code> è uguale a quello a <code>(30, 50)</code>?</li>
+  <li>La tua implementazione dà <code>max|diff| = 3e-3</code> contro il riferimento. È rumore numerico?</li>
+  <li>Perché un modello addestrato a 4k token può accettare 32k in ingresso senza errori e produrre risultati pessimi?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> La deviazione dei punteggi sale a circa <code>√4096 = 64</code>. Il softmax satura: un peso ≈1, gli altri ≈0. Il gradiente attraverso un softmax saturo è quasi nullo, quindi non arriva segnale a quello strato.</p>
+    <p><strong>2.</strong> <code>4096/512 = 8</code> teste query per gruppo. Si risparmiano parametri e calcolo su K e V, e soprattutto la KV cache in inferenza (fattore 8). Su Q niente.</p>
+    <p><strong>3.</strong> <strong>No.</strong> Dipende da <code>m − n</code>, che vale <code>+20</code> in un caso e <code>−20</code> nell'altro. Il segno conta: il modello distingue «venti token prima» da «venti token dopo».</p>
+    <p><strong>4.</strong> <strong>No.</strong> Il rumore di <code>float32</code> su queste operazioni sta intorno a <code>10⁻⁷</code>. Uno scarto di <code>3·10⁻³</code> è quattro ordini di grandezza sopra: c'è un errore vero — maschera, ordine delle dimensioni, scala mancante. Cercalo.</p>
+    <p><strong>5.</strong> Perché RoPE si <em>valuta</em> a qualunque posizione: nessun limite tecnico produce un errore. Ma le rotazioni a frequenze mai viste in addestramento generano configurazioni fuori distribuzione. Accettare l'ingresso e gestirlo bene sono due cose diverse.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

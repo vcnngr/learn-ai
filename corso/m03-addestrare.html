@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M03 — Cosa vuol dire addestrare</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m03">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M03 · 4 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Cosa vuol dire addestrare</h1>
+<p class="subtitle">Cinque righe di codice, ripetute qualche milione di volte. Alla fine di questa pagina ne avrai scritto uno da zero e visto la loss scendere.</p>
+
+<p class="lede">Hai già tutti i pezzi: sai cos'è un tensore, sai che una derivata dice in che direzione muoverti, sai che <code>backward()</code> le calcola tutte. Manca solo la regola che trasforma un gradiente in un aggiornamento — ed è una sottrazione.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Un peso vale <code>w = 2,0</code>. Il gradiente della loss rispetto a <code>w</code> vale <code>+3,0</code>. Il tasso di apprendimento è <code>0,1</code>.</p>
+    <ol>
+      <li>Il gradiente è positivo: per far <em>scendere</em> la loss, <code>w</code> deve aumentare o diminuire?</li>
+      <li>Se la regola è «sposta <code>w</code> di <code>lr × gradiente</code> nella direzione giusta», quanto vale <code>w</code> dopo l'aggiornamento?</li>
+      <li>Con <code>lr = 10</code> invece di <code>0,1</code>, quanto varrebbe? Ti sembra prudente?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Diminuire.</strong> Gradiente positivo significa «aumentando <code>w</code>, la loss sale». Vuoi il contrario.</p>
+    <p><strong>2.</strong> <code>w = 2,0 − 0,1 × 3,0 = <strong>1,7</strong></code></p>
+    <p><strong>3.</strong> <code>w = 2,0 − 10 × 3,0 = <strong>−28,0</strong></code>. Sei saltato dall'altra parte, molto più lontano di dove eri. Al passo dopo il gradiente punterà indietro, ancora più forte, e ricomincerai a saltare avanti e indietro allontanandoti ogni volta.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Hai appena scritto la discesa del gradiente</strong>, l'unica regola di aggiornamento che ti serve capire:</p>
+    <pre style="margin:10px 0"><code>w  ←  w  −  lr × (∂L/∂w)</code></pre>
+    <p>Il segno meno è tutto: il gradiente punta verso la salita, tu vai nel verso opposto. Il <code>lr</code> decide quanto ti fidi di quella direzione — e nel punto 3 hai già intuito che fidarsi troppo non è conservativo, è distruttivo.</p>
+  </div>
+</details>
+
+<h2>Il ciclo, cinque passi</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Ogni addestramento, dal più piccolo al più grande, è questo:</p>
+    <pre style="margin:10px 0"><code>for batch in dati:
+    pred = modello(batch.x)            # 1  avanti
+    loss = criterio(pred, batch.y)     # 2  quanto sbaglia (uno scalare)
+    loss.backward()                    # 3  indietro: riempie i .grad
+    optimizer.step()                   # 4  applica: w ← w − lr × grad
+    optimizer.zero_grad()              # 5  azzera, o si accumulano</code></pre>
+    <p>Tutto il resto — strati, attention, LoRA, parallelismo — è complicazione intorno a questi cinque passi. L'ordine non è negoziabile: non puoi applicare prima di aver calcolato, non puoi calcolare prima di sapere quanto sbagli.</p>
+  </div>
+</div>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>onesto</div>
+  <div class="body">
+    <p>Somiglia a un ciclo di riconciliazione: leggi lo stato, calcoli lo scostamento dal desiderato, applichi una correzione parziale, ripeti.</p>
+    <p><strong>Dove si rompe:</strong> in un riconciliatore lo stato desiderato è noto e la correzione è deterministica. Qui non esiste uno stato desiderato dei pesi — nessuno sa quali valori dovrebbero avere. Esiste solo una misura di errore, e una direzione locale che la riduce <em>un pochino</em>. Non converge a un target: si ferma quando smette di migliorare, e stabilire <em>quando</em> sia successo è un problema aperto che affronterai in M12.</p>
+  </div>
+</div>
+
+<h2>Il learning rate, dove si può calcolare</h2>
+
+<p>Il primo lab misura una cosa che di solito viene raccontata a intuito. Su una funzione semplice, <code>f(x) = x²</code>, la soglia di divergenza si <strong>calcola esattamente</strong> — e poi si verifica. È un caso di laboratorio, non il caso generale: serve per vedere <em>cosa</em> determina la soglia, prima di accettare che nel caso vero non si possa calcolare.</p>
+
+<pre data-lab="nessuno"><code>x_nuovo = x − lr · 2x = x · (1 − 2·lr)
+
+Ogni passo moltiplica x per il fattore (1 − 2·lr):
+
+  |1 − 2·lr| &lt; 1   →  converge
+  |1 − 2·lr| = 1   →  oscilla per sempre
+  |1 − 2·lr| &gt; 1   →  diverge
+
+Quindi: converge per 0 &lt; lr &lt; 1. A lr = 0,5 il fattore è 0: un solo passo.</code></pre>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Prima di lanciare il lab, compila mentalmente la colonna «esito» per <code>lr</code> = 0,1 · 0,5 · 0,9 · 1,0 · 1,1, partendo da <code>x = 5</code>.</p>
+    <p>Una domanda in più, che è quella interessante: <strong><code>lr = 0,9</code> e <code>lr = 0,1</code> danno lo stesso risultato o no?</strong> Guarda il fattore prima di rispondere.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 03.1<br>discesa</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_03_1_discesa.py</code></pre>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_03_1"><code>    lr    fattore    x finale (40 passi)   esito
+  0.01       0.98                 2.2285   converge, lentissimo
+  0.10       0.80            0.000664614   converge
+  0.50       0.00                      0   converge in UN passo
+  0.90      -0.80            0.000664614   converge
+  1.00      -1.00                      5   oscilla per sempre
+  1.01      -1.02                11.0402   diverge
+  1.10      -1.20                7348.86   diverge</code></pre>
+    <p><strong><code>lr = 0,9</code> e <code>lr = 0,1</code> danno lo stesso identico valore.</strong> Fattori <code>−0,80</code> e <code>+0,80</code>: stesso modulo, segni opposti. Uno converge scendendo dritto, l'altro rimbalzando fra positivo e negativo, ma alla stessa velocità.</p>
+    <p>Se questo ti ha sorpreso, hai imparato la cosa giusta: <strong>ciò che conta non è quanto è grande il <code>lr</code>, ma quanto è grande il fattore che ne risulta</strong> — e quel fattore dipende dalla curvatura della funzione, non solo dal tuo iperparametro. In una rete la curvatura è diversa in ogni direzione e cambia a ogni batch. Ecco perché il <code>lr</code> giusto non si calcola.</p>
+  </div>
+</details>
+
+<h3>Il rischio non è simmetrico</h3>
+
+<p>Il lab misura anche quanto costa sbagliare per difetto, contando i passi necessari a raggiungere <code>|x| &lt; 0,001</code>:</p>
+
+<table>
+<tr><th>lr</th><th>passi</th><th>rapporto</th></tr>
+<tr><td><code>0.500</code></td><td>1</td><td>—</td></tr>
+<tr><td><code>0.400</code></td><td>6</td><td>×6,0</td></tr>
+<tr><td><code>0.100</code></td><td>39</td><td>×6,5</td></tr>
+<tr><td><code>0.010</code></td><td>422</td><td>×10,8</td></tr>
+<tr><td><code>0.001</code></td><td>4 255</td><td>×10,1</td></tr>
+</table>
+
+<p>Due regimi. Lontano dall'ottimo il costo è <strong>inversamente proporzionale</strong>: dividi il <code>lr</code> per 10, moltiplichi i passi per 10. Vicino all'ottimo la sensibilità è molto più alta: da <code>0,5</code> a <code>0,4</code> il <code>lr</code> cala di appena 1,25 volte e i passi si moltiplicano per 6.</p>
+
+<p><strong>La conseguenza pratica:</strong> stare un po' sotto costa in proporzione — noioso ma prevedibile. Stare un po' sopra fa divergere e butta via tutto. Il rischio è asimmetrico, ed è il motivo per cui in pratica si cerca <em>il valore più alto che resta stabile</em>, non il più prudente. Warmup e schedule (M08) esistono perché quella soglia si sposta durante l'addestramento.</p>
+
+<div class="note errore">
+  <div class="mark">Cosa non<br>generalizzare</div>
+  <div class="body">
+    <p><code>f(x) = x²</code> è convessa, a una variabile, con soglia calcolabile in forma chiusa. <strong>Una rete non è niente di tutto questo:</strong> milioni di dimensioni con curvature diverse, e una superficie che cambia forma a ogni batch perché i dati sono diversi. Nessuna formula ti darà il <code>lr</code> giusto.</p>
+    <p>In particolare, <strong>non estendere la «soglia netta» all'addestramento vero</strong>. Qui il confine è unico ed esatto perché la funzione è convessa, deterministica e a una dimensione. Un addestramento reale è non convesso e stocastico: non c'è garanzia di un solo confine binario, esiste una fascia di valori che a volte reggono e a volte no, e la stabilità può dipendere dal seme, dai primi batch o dal punto dell'addestramento.</p>
+    <p>Quello che <em>si</em> porta via è più modesto e ancora utile: <strong>esistono due regimi qualitativamente diversi</strong> — uno in cui l'addestramento procede e uno in cui si rovina — e il passaggio da uno all'altro può avvenire per variazioni piccole del learning rate. Non «impari un po' peggio»: cambi regime.</p>
+  </div>
+</div>
+
+<h2>Il primo addestramento vero</h2>
+
+<p>Il modo onesto di verificare che un ciclo di addestramento funziona è <strong>fargli ritrovare una risposta che conosci già</strong>. Genero dati da <code>y = 3x + 2</code> con un po' di rumore, parto da <code>w = 0</code> e <code>b = 0</code>, e guardo se recupera il 3 e il 2.</p>
+
+<div class="note lab">
+  <div class="mark">Lab 03.2<br>addestramento</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_03_2_addestramento.py</code></pre>
+  </div>
+</div>
+
+<pre data-lab="lab_03_2"><code> passo        loss         w         b
+     0    12.06565    0.0000    0.0000
+    40     0.01125    2.9914    1.9952
+    80     0.01124    2.9923    1.9956
+   200     0.01124    2.9923    1.9956
+
+Trovati:  w = 2.9923   b = 1.9956        Veri: 3.0 e 2.0</code></pre>
+
+<div class="note errore">
+  <div class="mark">Come si legge<br>un log</div>
+  <div class="body">
+    <p>Ogni riga qui sopra è <strong>un solo stato</strong>: loss e pesi misurati nello stesso istante, prima dell'aggiornamento. Sembra ovvio, e la prima versione di questo lab sbagliava proprio qui — stampava la loss calcolata <em>prima</em> del passo insieme ai pesi <em>dopo</em>. Righe plausibili, che descrivevano due momenti diversi.</p>
+    <p>Il sintomo era visibile e l'avevo ignorato: al passo 0 comparivano <code>w = 0,5486</code> e <code>b = 0,3856</code>, ma l'addestramento parte da <code>w = 0</code> e <code>b = 0</code>. Quei valori erano già il risultato del primo aggiornamento.</p>
+    <p><strong>Vale per ogni log che leggerai, compresi quelli del LoRA del caso di studio:</strong> prima di interpretare due colonne affiancate, verifica che si riferiscano allo stesso stato. Un disallineamento di un passo è invisibile e cambia le conclusioni.</p>
+  </div>
+</div>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>La loss si ferma a <code>0,01124</code> e non scende più, nemmeno dopo 160 passi in più. <strong>Perché non arriva a zero?</strong> È un difetto dell'addestramento o è corretto così?</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>È corretto, ed è un dato importante.</strong> Ai dati è stato aggiunto rumore casuale con deviazione standard <code>0,1</code>. Nessun modello della forma <code>w·x + b</code> può spiegare quel rumore: è imprevedibile per costruzione.</p>
+    <p>L'errore residuo è circa <code>0,1² = 0,01</code> — e infatti la loss si ferma a <code>0,01124</code>. Il modello ha estratto <em>tutto</em> il segnale disponibile e si è fermato lì.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Rovescia il ragionamento e ottieni una regola diagnostica: <strong>una loss che scende a zero su dati rumorosi non è un successo, è un allarme.</strong> Significa che il modello sta spiegando anche il rumore — cioè sta memorizzando. È esattamente quello che vedi nella prossima sezione.</p>
+  </div>
+</details>
+
+<h3>La riga dimenticata</h3>
+
+<p>Il lab ripete lo stesso addestramento togliendo <code>zero_grad()</code>. Il sintomo non è quello che ti aspetteresti, e vale la pena guardarlo bene:</p>
+
+<pre data-lab="lab_03_2"><code> passo            loss        |grad w|
+     0         12.0656          5.4855
+     3          0.0444         12.9643     ← sembra andare benissimo
+     7         12.4452          4.0079
+    24          1.5646         13.0051
+    32          0.3802         13.3342
+
+Dopo 40 passi:  min 0.044   max 12.567
+Col ciclo corretto:  0.01124, e ferma.</code></pre>
+
+<div class="note errore">
+  <div class="mark">Il sintomo<br>che non c'è</div>
+  <div class="body">
+    <p>Verrebbe da dire «se dimentichi <code>zero_grad()</code> la loss sale». <strong>Falso, e cercare quel sintomo ti fa mancare il bug.</strong></p>
+    <p>Qui la loss non sale in modo monotono e non esplode a <code>NaN</code>: <strong>oscilla</strong>, dentro un intervallo, indefinitamente. E ogni tanto tocca valori bassissimi — al passo 3 vale <code>0,044</code>, quaranta volte meglio dell'inizio. Se guardi il log in quel momento, sembra il miglior addestramento della tua vita.</p>
+    <p><strong>Ma non trasformare questa osservazione in una regola.</strong> In questo esperimento il segno distintivo è la mancata convergenza; con altri modelli, altri learning rate o altri dati lo stesso bug può divergere a <code>NaN</code> o saturare. Ciò che l'accumulo produce <em>sempre</em> è un aggiornamento più grande del dovuto. Come si manifesti nei log, no.</p>
+    <p><strong>La verifica che non dipende dal sintomo:</strong> guarda il codice, oppure stampa la norma del gradiente prima e dopo l'azzeramento. Costa meno che indovinare dai log — ed è lo stesso principio della scala di isolamento di M02: si diagnostica con un intervento, non con un sintomo.</p>
+  </div>
+</div>
+
+<h2>La training loss mente</h2>
+
+<p>Ultimo esperimento, ed è quello che giustifica metà del corso. Dodici punti di dati, un polinomio di grado 15 — sedici parametri per dodici punti, <em>più parametri che dati</em>. Misuro la loss sui punti di addestramento e su duecento punti tenuti da parte, mai visti.</p>
+
+<pre data-lab="lab_03_2"><code>  passo   loss ADDESTRAMENTO   loss TENUTI DA PARTE
+      0             0.521515               0.520761
+   4000             0.002754               0.022311   ← minimo
+   8000             0.002319               0.033685
+  12000             0.002067               0.042991
+  16000             0.001874               0.050361
+  20000             0.001765               0.056741
+
+addestramento:    0.521515 → 0.001765  =  295× meglio
+tenuti da parte:  minimo 0.022311 al passo 4.000
+                  finale 0.056741      =  2.5× PEGGIO del suo minimo</code></pre>
+
+<p>La colonna di sinistra <strong>scende sempre</strong>. Quella di destra tocca il minimo al passo 4.000 e poi risale: a fine corsa è <strong>2,5 volte peggiore del proprio minimo</strong>. Il modello sta diventando misurabilmente peggiore mentre il numero che guardi migliora.</p>
+
+<p>Nota anche il passo 0: le due loss sono quasi identiche (<code>0,5215</code> e <code>0,5208</code>). All'inizio il modello è ugualmente ignorante ovunque. La divergenza fra le due colonne è <em>prodotta dall'addestramento stesso</em>.</p>
+
+<div class="note errore">
+  <div class="mark">La conseguenza<br>che ti riguarda</div>
+  <div class="body">
+    <p>Guardando solo la training loss, questo addestramento sembra un successo pieno: monotona, senza scossoni, quasi 300 volte meglio dell'inizio.</p>
+    <p><strong>La training loss misura quanto il modello si adatta a dati che ha già visto — cioè esattamente ciò che non ti interessa.</strong> Non è una misura di qualità e non lo sarà mai, per quanto bella sia la curva.</p>
+    <p>Quando in M21 guarderemo il LoRA del caso di studio, la training loss sarà una delle informazioni <em>meno</em> utili a disposizione. Gli strumenti per misurare qualcosa di reale sono in M12, e per questo M12 viene prima dei moduli sull'addestramento.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li><code>w = 5</code>, <code>∂L/∂w = −2</code>, <code>lr = 0,3</code>. Quanto vale <code>w</code> dopo l'aggiornamento?</li>
+  <li>Nel ciclo a cinque passi, cosa succede se metti <code>zero_grad()</code> <em>prima</em> di <code>backward()</code> anziché dopo <code>step()</code>?</li>
+  <li>Su <code>f(x) = x²</code>, perché <code>lr = 0,9</code> e <code>lr = 0,1</code> convergono alla stessa velocità?</li>
+  <li>La tua loss di addestramento scende a zero su dati che sai essere rumorosi. Buona o cattiva notizia?</li>
+  <li>Qual è il sintomo affidabile di <code>zero_grad()</code> mancante, e quale sintomo <em>non</em> lo rivela?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>w = 5 − 0,3 × (−2) = 5 + 0,6 = <strong>5,6</strong></code>. Gradiente negativo → il peso <em>aumenta</em>. Il doppio segno meno è il punto.</p>
+    <p><strong>2.</strong> Nulla di male: funziona. L'importante è che ci sia un azzeramento fra un <code>backward()</code> e il successivo. Metterlo all'inizio del ciclo è una variante comune e altrettanto corretta.</p>
+    <p><strong>3.</strong> Perché i fattori sono <code>1 − 2(0,9) = −0,8</code> e <code>1 − 2(0,1) = +0,8</code>: stesso modulo. Uno scende dritto, l'altro rimbalza fra positivo e negativo, alla stessa velocità.</p>
+    <p><strong>4.</strong> <strong>Cattiva.</strong> Il rumore è imprevedibile per definizione: se il modello lo sta spiegando, lo sta memorizzando. La loss dovrebbe fermarsi al livello del rumore, come nel lab a <code>0,01124</code>.</p>
+    <p><strong>5.</strong> Domanda con una premessa sbagliata, ed è voluta: <strong>non esiste un sintomo affidabile</strong>. Nell'esperimento qui sopra la loss oscilla senza convergere, ma con altri modelli o learning rate può divergere a <code>NaN</code> o saturare. Cercare «la loss sale» in particolare fa mancare proprio il caso mostrato. La verifica che funziona sempre non passa dai log: guardi il codice, o stampi la norma del gradiente prima e dopo l'azzeramento.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

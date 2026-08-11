@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M17 — RL online e distillazione</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m17">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M17 · 6 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>RL online e distillazione</h1>
+<p class="subtitle">I due metodi più costosi del corso. Il loro prezzo non è un'opinione: si calcola, e va calcolato prima di sceglierli.</p>
+
+<p class="lede">Su poche GPU di questi metodi vedi la <strong>meccanica</strong>, non il regime in cui diventano interessanti. Questo modulo serve a farti scegliere consapevolmente — e soprattutto a farti dire di no quando la risposta è no.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Vuoi fare RL online su un modello da 27B con LoRA.</p>
+    <ol>
+      <li>Quanti modelli devi tenere in memoria contemporaneamente con PPO classico? E con GRPO?</li>
+      <li>Un passo di SFT elabora tutta la sequenza in parallelo. Un passo di RL online cosa deve fare <em>prima</em> di poter calcolare la loss?</li>
+      <li>GRPO elimina il <em>value model</em> usando la media di K campioni come riferimento. Per dimezzare l'errore di quella media, quanti campioni servono?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_17_1"><code>metodo            addestr.  congelati  genera?  GB statici
+SFT                      1          0       no        55.9
+DPO                      1          1       no       109.9
+PPO (classico)           2          2       si       219.7
+GRPO                     1          1       si       109.9</code></pre>
+    <p><strong>1.</strong> PPO classico: <strong>quattro</strong> — policy e value addestrati, riferimento e reward congelati. GRPO: <strong>due</strong>.</p>
+    <p><strong>2.</strong> Deve <strong>generare</strong> la risposta, un token alla volta. Non è un fattore moltiplicativo sul costo: è un'operazione di natura diversa, che non si parallelizza sulla lunghezza.</p>
+    <p><strong>3. Quattro volte tanti.</strong> L'errore scende come <code>1/√K</code>. Misurato: passando da 4 a 16 campioni l'errore si riduce di 1,83×, da 16 a 64 di 1,98×.</p>
+  </div>
+</details>
+
+<div class="note lab">
+  <div class="mark">Lab 17.1<br>RL e distillazione</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_17_1_rl_distill.py</code></pre>
+  </div>
+</div>
+
+<h2>Il costo che non si vede nei GB</h2>
+
+<pre data-lab="lab_17_1"><code>token da generare   passaggi sequenziali   vs 1 forward
+                1                      1             1x
+               64                     64            64x
+              256                    256           256x
+             1024                   1024          1024x</code></pre>
+
+<div class="note errore">
+  <div class="mark">Perché è<br>diverso da<br>«più lento»</div>
+  <div class="body">
+    <p>La generazione è <strong>sequenziale per costruzione</strong>: il token <em>n+1</em> dipende dal token <em>n</em>. Non si parallelizza sulla lunghezza, e nessuna GPU in più lo risolve.</p>
+    <p>A questo si aggiungono due cose che il conto statico non mostra: una <strong>KV cache viva</strong> durante la generazione — in M06 avevi visto che nel training non esiste, qui invece sì — e un <strong>secondo profilo di memoria</strong>, diverso da quello di addestramento, che va calcolato a parte.</p>
+    <p>Con GRPO si moltiplica ancora per <code>K</code>, il numero di campioni per prompt.</p>
+  </div>
+</div>
+
+<h2>GRPO: dove si sposta il costo</h2>
+
+<pre data-lab="lab_17_1"><code>K campioni    media  errore std   vs K/4
+         2   0.5089      0.1389        -
+         4   0.5117      0.1131        -
+         8   0.4993      0.0852        -
+        16   0.5017      0.0620    1.83x
+        64   0.4993      0.0313    1.98x</code></pre>
+
+<p>PPO usa un <em>value model</em> — un secondo modello da addestrare — per stimare quanto è buono uno stato. GRPO lo elimina: campiona <code>K</code> risposte per lo stesso prompt e usa la loro media come riferimento.</p>
+
+<p><strong>Il baratto è esplicito:</strong> niente value model da addestrare, ma il costo si sposta sulla generazione, che paghi <code>K</code> volte per prompt. Con <code>K</code> piccolo il baseline è rumoroso; con <code>K</code> grande costa. E per dimezzare il rumore servono quattro volte i campioni — cioè quattro volte le generazioni.</p>
+
+<h2>Distillazione non è «dataset sintetico»</h2>
+
+<pre data-lab="lab_17_1"><code>Distribuzione del TEACHER su 8 token possibili:
+ 0.524  0.318  0.071  0.032  0.026  0.016  0.010  0.004
+
+Bersaglio SECCO (solo il token campionato):
+ 1.000  0.000  0.000  0.000  0.000  0.000  0.000  0.000
+
+Entropia della distribuzione del teacher: 1.2258 nat</code></pre>
+
+<div class="note nozione">
+  <div class="mark">Due metodi<br>diversi</div>
+  <div class="body">
+    <p><strong>Distillazione (a livello di logit):</strong> lo student impara a riprodurre l'intera <em>distribuzione</em> del teacher. Il teacher non dice solo «la risposta è il token 0»: dice che il token 1 è quasi altrettanto buono e che il token 7 è da escludere. <em>Richiede</em> accesso ai logit — quindi al modello — e tokenizer condiviso.</p>
+    <p><strong>Dataset sintetico (a livello di sequenza):</strong> il teacher genera testo, lo student fa SFT su quel testo. Richiede solo l'output. Funziona anche con tokenizer diversi e con un teacher accessibile solo tramite API.</p>
+    <p>Chiamarli entrambi «distillazione» fa scegliere quello sbagliato — tipicamente si pianifica il primo e si scopre a metà che il tokenizer non coincide, o che il teacher non espone i logit.</p>
+  </div>
+</div>
+
+<h3>La temperatura</h3>
+
+<pre data-lab="lab_17_1"><code>    T  distribuzione del teacher                        entropia
+  0.5  0.718 0.264 0.013 0.003 0.002 0.001 0.000 0.000     0.681
+  1.0  0.524 0.318 0.071 0.032 0.026 0.016 0.010 0.004     1.226
+  2.0  0.332 0.259 0.122 0.082 0.074 0.058 0.045 0.027     1.774
+  4.0  0.221 0.195 0.134 0.110 0.104 0.092 0.081 0.063     1.998</code></pre>
+
+<p>A temperatura bassa la distribuzione collassa sul massimo e la distillazione degenera nel bersaglio secco — hai buttato via l'informazione per cui l'avevi scelta. A temperatura alta si appiattisce e il segnale utile si confonde con il rumore delle code.</p>
+
+<p>Il valore giusto dipende dal teacher e dal compito: è un iperparametro <strong>da misurare</strong> con M12, non da copiare.</p>
+
+<h2>Quando sono la scelta sbagliata</h2>
+
+<div class="note errore">
+  <div class="mark">RL online<br>(GRPO, PPO)</div>
+  <div class="body">
+    <p><strong>Sbagliato se sai già scrivere o preferire le risposte giuste.</strong> Stai pagando una generazione a ogni passo per un segnale che avresti gratis con SFT o DPO.</p>
+    <p><strong>Sbagliato se non hai una ricompensa affidabile.</strong> Il modello ottimizzerà <em>esattamente</em> la funzione che hai scritto, comprese le sue scorciatoie. Una ricompensa approssimativa non dà un risultato approssimativo: dà un risultato che massimizza l'approssimazione.</p>
+    <p><strong>Giusto se</strong> la qualità è verificabile automaticamente — un test che passa, un risultato numerico corretto — ma non sai scrivere in anticipo la risposta.</p>
+  </div>
+</div>
+
+<div class="note errore">
+  <div class="mark">Distillazione</div>
+  <div class="body">
+    <p><strong>Sbagliato se il teacher non è migliore dello student sul tuo compito.</strong> Distillare da un modello mediocre produce uno student mediocre, in modo molto efficiente.</p>
+    <p><strong>Sbagliato se i tokenizer differiscono</strong> e volevi il livello dei logit. Verificalo prima di progettare la pipeline, non dopo.</p>
+    <p><strong>Giusto se</strong> hai un modello grande che funziona e ti serve la stessa capacità a costo di inferenza minore.</p>
+  </div>
+</div>
+
+<p>In entrambi i casi la domanda preliminare è quella di M13: <strong>il modello non <em>sa</em>, o non si <em>comporta</em>?</strong> E la risposta si misura, non si assume.</p>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>PPO classico su un 27B: quanti modelli in memoria, e quali addestri?</li>
+  <li>Perché aggiungere GPU non risolve il costo della generazione?</li>
+  <li>GRPO con <code>K=4</code> ti dà un baseline troppo rumoroso. Passi a <code>K=8</code>. È abbastanza?</li>
+  <li>Il tuo teacher è accessibile solo via API. Quale forma di distillazione puoi fare?</li>
+  <li>Hai una ricompensa automatica che premia risposte lunghe come proxy di completezza. Cosa succede?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <strong>Quattro:</strong> policy e value <em>addestrati</em>, riferimento e reward <em>congelati</em>. Circa 220 GB statici nel conto del lab, contro 55,9 dell'SFT.</p>
+    <p><strong>2.</strong> Perché è sequenziale per costruzione: il token <em>n+1</em> dipende dal token <em>n</em>. Puoi parallelizzare fra prompt diversi, non lungo la sequenza.</p>
+    <p><strong>3. No.</strong> Da 4 a 8 l'errore scende di circa <code>√2</code>, cioè del 30%. Per dimezzarlo servono <code>K=16</code>, e ogni campione è una generazione completa.</p>
+    <p><strong>4.</strong> Solo quella <strong>a livello di sequenza</strong> — cioè generare testo e fare SFT su quello. Il livello dei logit richiede accesso al modello e tokenizer condiviso.</p>
+    <p><strong>5.</strong> Il modello produrrà risposte <strong>lunghe</strong>, non complete. Ottimizza esattamente la funzione che hai scritto: è il caso «ricompensa non affidabile», e si manifesta come un modello che massimizza il proxy invece dell'obiettivo.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

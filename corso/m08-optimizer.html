@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M08 — Optimizer, learning rate, batch</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m08">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M08 · 7 h · <span class="pill cpu">CPU · gira sul portatile</span></p>
+<h1>Optimizer, learning rate, batch</h1>
+<p class="subtitle">La voce più grande del tuo conto di memoria, e le tre righe di configurazione che rovinano più addestramenti di qualunque altra cosa.</p>
+
+<p class="lede">In M06 hai visto che gli stati dell'optimizer sono <strong>216 GB su 432</strong>: la voce più costosa di tutte. Qui scopri cosa comprano quei byte, e perché senza di essi l'addestramento non funzionerebbe.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Addestro con <strong>micro-batch 8 e 4 accumulazioni</strong> invece che con un batch da 32. Stessa quantità di dati per aggiornamento.</p>
+    <ol>
+      <li>Il risultato è identico a un batch da 32, simile, o diverso?</li>
+      <li>Se dimentico di dividere la loss per il numero di accumulazioni, cosa cambia <em>esattamente</em>?</li>
+      <li>Quel dimenticanza produce un errore, un avviso, o niente?</li>
+    </ol>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <pre data-lab="lab_08_1"><code>    lr      batch 32    8x4 CON /accum    8x4 SENZA /accum
+  0.05       0.09095           0.09095             0.03271
+   0.1       0.05000           0.05000             0.06024
+   0.2       0.03271           0.03271             DIVERGE
+   0.5       DIVERGE           DIVERGE             DIVERGE</code></pre>
+    <p><strong>1.</strong> <strong>Identico</strong> a ogni learning rate, su tutte le cifre stampate. Le prime due colonne coincidono: l'accumulazione fatta bene <em>è</em> un batch grande. È il modo standard di ottenere batch che in memoria non ci starebbero.</p>
+    <p><strong>2.</strong> Sommi i gradienti invece di mediarli: qui equivale a <strong>moltiplicare il learning rate per il numero di accumulazioni</strong>. Nella terza colonna, un lr effettivo 4 volte più alto.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Sotto quali condizioni.</strong> Nessuna delle due risposte è universale, e le condizioni sono quelle del lab: <strong>SGD</strong>, loss <strong>additiva sugli esempi</strong>, micro-batch <strong>tutti della stessa dimensione</strong>, nessuna operazione che dipenda dal batch.</p>
+    <ul>
+      <li><strong>L'equivalenza (1) si rompe</strong> con normalizzazioni o stati che dipendono dal batch, con denominatori diversi fra micro-batch — è il caso tipico delle sequenze con maschera, dove il numero di token supervisionati varia — e con dropout o qualunque consumo di RNG che cambi ordine. In precisione finita resta comunque un'equivalenza a meno dell'arrotondamento, non bit per bit.</li>
+      <li><strong>Con sequenze mascherate</strong> la divisione giusta non è «per il numero di accumulazioni» ma <strong>per il numero complessivo di token supervisionati</strong> del batch effettivo. Dividere per <code>accum</code> pesa di più i micro-batch con pochi token validi.</li>
+      <li><strong>La riscrittura (2) come «learning rate ×4» vale per l'update lineare di SGD.</strong> Con AdamW no: il passo divide per la radice di <code>exp_avg_sq</code>, quindi un gradiente riscalato viene in buona parte <em>normalizzato via</em>, e ciò che resta interagisce con <code>epsilon</code>, con il clipping e con il weight decay disaccoppiato. Descrivilo per quello che è — <strong>un riscalamento del gradiente</strong> — e non aspettarti che equivalga a toccare il learning rate.</li>
+    </ul>
+    <p><strong>3.</strong> <strong>Niente.</strong> Nessun errore, nessun avviso.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Guarda la prima riga: senza la divisione la loss viene <em>migliore</em> (0,033 contro 0,091). A learning rate basso l'errore <strong>sembra un miglioramento</strong>. Poi a <code>lr=0,2</code> la configurazione corretta converge e quella sbagliata <strong>diverge</strong>.</p>
+    <p>Questa è la forma tipica dei bug che ti costano una settimana: non falliscono subito, falliscono quando cambi qualcos'altro.</p>
+  </div>
+</details>
+
+<h2>Cosa tengono in memoria, contato</h2>
+
+<div class="note lab">
+  <div class="mark">Lab 08.1<br>optimizer</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_08_1_optimizer.py</code></pre>
+    <p>Gli stati non sono stimati: sono letti da <code>optimizer.state</code> dopo un passo vero.</p>
+  </div>
+</div>
+
+<pre data-lab="lab_08_1"><code>optimizer               stati/par  byte/par  tensori  nomi
+SGD (senza momento)             0       0.0        0  -
+SGD + momento                   1       4.0        1  momentum_buffer
+Adam                            2       8.0        2  exp_avg, exp_avg_sq
+AdamW                           2       8.0        2  exp_avg, exp_avg_sq</code></pre>
+
+<pre><code>dtype dei pesi      dtype degli stati   byte/parametro
+float32                       float32                8
+bfloat16                     bfloat16                4
+float16                       float16                4</code></pre>
+
+<div class="note errore">
+  <div class="mark">Il dtype degli<br>stati SEGUE<br>quello dei pesi</div>
+  <div class="body">
+    <p>Si sente dire che AdamW «costa 8 byte per parametro». <strong>Il lab lo chiede all'optimizer invece di assumerlo, e la risposta dipende dai pesi:</strong> con pesi <code>bf16</code>, PyTorch crea stati <code>bf16</code> — <strong>4 byte, non 8</strong> — e <em>non</em> crea nessuna copia master <code>fp32</code> da sola.</p>
+    <p>Gli 8 byte più la copia master appartengono a una <strong>configurazione di mixed precision costruita apposta</strong> — quella che molti framework di addestramento impostano per te — non ad «AdamW» come algoritmo.</p>
+    <p><strong>Conseguenza diretta sul conto di M06:</strong> <code>byte_stati</code> e <code>byte_master</code> non sono costanti da memorizzare. Sono valori da <em>misurare sul proprio stack</em>, con il codice di questo lab. Il totale di 432 GB per il full fine-tuning descrive <em>una</em> configurazione, dichiarata — non un fatto universale.</p>
+  </div>
+</div>
+
+<p>Resta vero il punto che conta per la memoria: AdamW tiene <strong>due</strong> tensori per parametro, mentre SGD senza momento non ne tiene nessuno. Quel rapporto non cambia col dtype — cambia quanto costa ciascuno.</p>
+
+<h2>Cosa comprano quegli 8 byte</h2>
+
+<p>Una superficie con pendenze molto diverse nelle due direzioni — <code>f(x,y) = 10x² + 0,1y²</code>, cento volte più ripida lungo <code>x</code>. Stesso learning rate, stessi 60 passi, partenza da <code>(1, 1)</code>:</p>
+
+<pre data-lab="lab_08_1"><code>optimizer                   lr     x finale     y finale    distanza
+SGD                       0.05     0.000000     0.547157    0.547157
+SGD + momento             0.05    -0.030517     0.003958    0.030772
+Adam                      0.05     0.021464     0.021464    0.030354</code></pre>
+
+<p><strong>SGD azzera <code>x</code> e non si muove quasi su <code>y</code>.</strong> Il learning rate che sopravvive sull'asse ripido è troppo piccolo per quello piatto: dopo 60 passi <code>y</code> è ancora a 0,55, praticamente dov'era.</p>
+
+<p>Adam divide il passo per la scala del gradiente <em>di ciascun parametro</em> — è a questo che serve <code>exp_avg_sq</code>, il secondo momento. Risultato: avanza su entrambi gli assi. In una rete vera le scale dei gradienti differiscono di ordini di grandezza fra strati diversi, e questo è il motivo per cui si paga.</p>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>onesto</div>
+  <div class="body">
+    <p><code>exp_avg</code> (il momento) somiglia a una media mobile esponenziale su una metrica: smorza il rumore, ricorda la tendenza recente.</p>
+    <p><strong>Dove il ponte si ferma:</strong> <code>exp_avg_sq</code> non ha un equivalente naturale nel monitoraggio. È una media mobile del gradiente <em>al quadrato</em>, usata come <em>divisore</em> — serve a normalizzare la scala, non a stimare un valore. Il suo effetto è rendere il passo indipendente da quanto è grande il gradiente, cosa che nessuna dashboard fa.</p>
+  </div>
+</div>
+
+<h2>Il warmup, misurato</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Stesso modello, stesso learning rate, con e senza warmup di 15 passi. Guardando solo la <strong>loss finale</strong> dopo 60 passi, ti aspetti una differenza grande?</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p><strong>La loss finale non è la metrica giusta</strong>, e il primo tentativo di questo lab lo sbagliava: confrontava i valori finali e non mostrava nulla di interessante. Il fenomeno sta nel <strong>picco iniziale</strong>.</p>
+    <pre data-lab="lab_08_1"><code>    lr    senza warmup: picco    con warmup(15): picco
+  0.05                  55.91                     1.04
+   0.1                6620.82                     1.37
+   0.2              112643.40                   332.79
+   0.5           191583200.00                 16551.92</code></pre>
+    <p>Tutti partono da una loss di circa <strong>1,0</strong>. Senza warmup, a <code>lr=0,1</code> la loss schizza a <strong>6 620</strong> prima di riprendersi. Con warmup resta a <strong>1,37</strong>.</p>
+    <p><strong>Il meccanismo:</strong> all'inizio gli stati di Adam sono vuoti. Le sue stime della scala del gradiente sono costruite su uno o due campioni, quindi inaffidabili — e il passo che ne esce può essere enorme. Il warmup gli dà il tempo di riempirsi prima di fidarsene.</p>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Perché su un modello grande è peggio.</strong> Qui il picco si riassorbe: dopo 60 passi la loss finale è simile nei due casi. Su un modello grande quei primi passi possono spostare i pesi così lontano da non tornare più — e il log non mostra nessun errore, solo un addestramento che poi rende meno del previsto.</p>
+  </div>
+</details>
+
+<h2>Il gradient clipping</h2>
+
+<pre data-lab="lab_08_1"><code>soglia  10.0  norma prima 5.00  dopo 5.0000   direzione invariata: True
+soglia   5.0  norma prima 5.00  dopo 5.0000   direzione invariata: True
+soglia   1.0  norma prima 5.00  dopo 1.0000   direzione invariata: True</code></pre>
+
+<p><strong>Riscala, non taglia.</strong> Se la norma supera la soglia, l'intero vettore viene moltiplicato per un fattore che la riporta al limite: la <em>direzione</em> resta identica, cambia solo la lunghezza. Non è un troncamento componente per componente.</p>
+
+<div class="note errore">
+  <div class="mark">Diagnostica</div>
+  <div class="body">
+    <p>Il clipping difende dai <strong>picchi isolati</strong>: un batch anomalo, un'esponenziale della regola della catena (M02). È una rete di sicurezza.</p>
+    <p><strong>Se interviene a ogni passo, non ti sta salvando: ti sta nascondendo un problema.</strong> Significa che la norma del gradiente è stabilmente sopra la soglia, e la causa è altrove — learning rate troppo alto, dati non normalizzati, inizializzazione sbagliata. Il clipping continuo maschera il sintomo e rallenta l'addestramento senza risolverlo.</p>
+    <p>Quindi: <strong>registra la frazione di passi in cui il clipping interviene.</strong> È una metrica diagnostica gratuita, e in M21 sarà una delle prime da chiedere.</p>
+  </div>
+</div>
+
+<h2>Il batch effettivo</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <pre style="margin:10px 0"><code>batch effettivo = micro_batch × accumulazioni × numero di GPU</code></pre>
+    <p>È questo il numero che determina il comportamento dell'addestramento. Gli altri tre sono solo modi di ripartirlo fra memoria e tempo.</p>
+    <p><strong>Conseguenza che sorprende:</strong> passare da 1 a 2 GPU con DDP <em>raddoppia il batch effettivo</em> anche se non hai toccato nessun parametro di configurazione. L'addestramento che gira su due GPU non è lo stesso che girava su una — e se confronti i risultati senza saperlo, stai confrontando due cose diverse.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Modello 27B, LoRA con 132,6 milioni di parametri addestrabili — la configurazione del caso di studio, sette moduli a <code>r=32</code> — e AdamW. Quanti GB di stati optimizer?</li>
+  <li>Perché SGD resta indietro sulla valle stretta e Adam no? Quale dei due stati fa il lavoro?</li>
+  <li>Passi da <code>accum=1</code> a <code>accum=8</code> senza toccare altro e l'addestramento diverge. Prima ipotesi?</li>
+  <li>Il tuo clipping interviene sul 100% dei passi. Buon segno o cattivo?</li>
+  <li>Stessa config su 1 GPU e su 2 GPU con DDP: i due addestramenti sono confrontabili?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> <code>1,33·10⁸ × 8 byte = 1,06 GB</code> — la riga «stati optimizer» che M06 arrotonda a 1,1. Confronta con i 216 GB del full fine-tuning: è tutto lì il risparmio di LoRA.</p>
+    <p><strong>2.</strong> Il learning rate che sopravvive sull'asse ripido è troppo piccolo per quello piatto. Adam normalizza il passo per la scala del gradiente di ogni parametro: il lavoro lo fa <code>exp_avg_sq</code>, il secondo momento, usato come divisore.</p>
+    <p><strong>3.</strong> <strong>Manca la divisione della loss per il numero di accumulazioni:</strong> stai sommando i gradienti invece di mediarli, quindi il gradiente su cui l'optimizer fa il passo è 8 volte quello che credi. Con SGD è come avere un learning rate 8 volte più alto; con AdamW gran parte del fattore viene normalizzata dai momenti, e l'effetto residuo passa da <code>epsilon</code>, clipping e weight decay — <em>diverso</em>, ma non «lr×8». Verifica guardando dove viene chiamato <code>.backward()</code>.</p>
+    <p><strong>4.</strong> <strong>Cattivo.</strong> Il clipping è per i picchi isolati. Se interviene sempre, la norma è stabilmente troppo alta e la causa è a monte — sta mascherando il problema, non risolvendolo.</p>
+    <p><strong>5.</strong> <strong>No</strong>, se non hai compensato: con DDP il batch effettivo raddoppia. Sono due addestramenti diversi, e la differenza nei risultati non dice niente su quello che volevi confrontare.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>

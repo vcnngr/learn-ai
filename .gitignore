@@ -1,0 +1,20 @@
+# --- artefatti di build, si rigenerano ------------------------------
+corso/.verifica-cache/
+corso/graphify-out/
+
+# --- transcript grezzi degli agenti di revisione --------------------
+# I DELIVERABLE della revisione (findings.md, proposte.md) sono versionati:
+# sono l'evidenza della revisione multi-modello e vanno letti.
+# I log grezzi no: sono transcript di sessione da decine di migliaia di
+# righe, con percorsi assoluti della macchina di sviluppo, contenuti di
+# file non attinenti e rumore di tooling. Non aggiungono niente che i
+# findings non dicano meglio.
+corso/review/*/_log.txt
+
+# --- roba di sistema e di editor ------------------------------------
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
+.venv/
+venv/

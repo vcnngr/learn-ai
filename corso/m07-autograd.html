@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M07 — Forward, backward, autograd</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-module="m07">
+<div class="wrap">
+
+<aside class="sidebar"><div class="sidebar-inner">
+  <a class="brand" href="index.html">Capire, addestrare,<br>diagnosticare</a>
+  <div class="brand-sub" data-profilo="hw"></div>
+  <nav id="nav"></nav>
+</div></aside>
+
+<main>
+
+<p class="eyebrow">M07 · 8 h · <span class="pill cpu">CPU</span><span class="pill gpu">+ GPU per le misure</span></p>
+<h1>Forward, backward, autograd</h1>
+<p class="subtitle">Perché la memoria sparisce durante l'andata e non durante il ritorno. E come comprarne indietro pagando in tempo.</p>
+
+<p class="lede">In M02 hai dedotto che le attivazioni esistono perché <code>∂L/∂W = Xᵀ(∂L/∂Y)</code> richiede <code>X</code>. Qui lo verifichi <em>chiedendolo al grafo</em> invece di crederci, e scopri che non tutte le operazioni costano uguale.</p>
+
+<h2>Prima di leggere</h2>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi</div>
+  <div class="body">
+    <p>Quattro operazioni. Per ciascuna: <strong>quali tensori devono restare in memoria</strong> fino al calcolo all'indietro?</p>
+    <pre style="margin:10px 0"><code>y = x @ W
+y = relu(x)
+y = x * 2
+y = x.exp()</code></pre>
+    <p>Non serve conoscere PyTorch: ragiona sulla derivata. <em>Per calcolare il gradiente locale, di cosa ho bisogno?</em></p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Mostra la risposta</summary>
+  <div class="risposta-inner">
+    <p>Non te lo dico: <strong>lo chiediamo al grafo</strong>. Ogni nodo espone gli attributi <code>_saved_*</code> con quello che ha trattenuto.</p>
+    <pre><code>operazione     grad_fn            tensori trattenuti
+y = x @ W      MmBackward0        mat2[8, 16], self[4, 8]
+y = relu(x)    ReluBackward0      result[4, 8]
+y = x * 2      MulBackward0       other[]
+y = x.exp()    ExpBackward0       result[4, 8]</code></pre>
+    <table style="margin-top:14px">
+      <tr><th>Operazione</th><th>Cosa trattiene, e perché</th></tr>
+      <tr><td><code>x @ W</code></td><td><strong>Entrambi</strong> gli ingressi: <code>self</code> (=x) serve per <code>∂L/∂W</code>, <code>mat2</code> (=W) per <code>∂L/∂x</code>. Ma <code>W</code> è già un parametro persistente: <strong><code>x</code> è il costo nuovo.</strong></td></tr>
+      <tr><td><code>relu(x)</code></td><td>Trattiene l'<strong>uscita</strong>, grande quanto l'ingresso. Concettualmente basterebbe sapere <em>dove</em> l'ingresso era positivo — un bit per elemento — ma l'implementazione tiene il tensore intero.</td></tr>
+      <tr><td><code>x * 2</code></td><td>Solo lo scalare <code>2</code>, forma <code>[]</code>. <strong>Non trattiene <code>x</code>.</strong> La derivata è la costante 2: l'ingresso non serve. Costo nullo, per quanto grande sia <code>x</code>.</td></tr>
+      <tr><td><code>x.exp()</code></td><td>L'uscita, perché la derivata di <code>eˣ</code> è <code>eˣ</code>: il risultato già calcolato <em>è</em> il gradiente locale.</td></tr>
+    </table>
+    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se avevi risposto «relu trattiene solo il segno», hai ragione <em>in teoria</em> e torto <em>in pratica</em>: è la differenza fra cosa servirebbe e cosa l'implementazione fa. Distinzione che conta ogni volta che stimi la memoria.</p>
+  </div>
+</details>
+
+<h2>Il grafo</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Mentre calcoli in avanti, PyTorch registra chi ha prodotto cosa. Ogni tensore non-foglia porta un <code>grad_fn</code>: l'operazione che l'ha generato.</p>
+    <pre style="margin:10px 0" data-lab="lab_07_1"><code>    x  shape=[4, 8]   requires_grad=True  grad_fn=FOGLIA
+   W1  shape=[8, 16]  requires_grad=True  grad_fn=FOGLIA
+    h  shape=[4, 16]  requires_grad=True  grad_fn=MmBackward0
+    a  shape=[4, 16]  requires_grad=True  grad_fn=ReluBackward0
+    y  shape=[4, 4]   requires_grad=True  grad_fn=MmBackward0
+ loss  shape=[]       requires_grad=True  grad_fn=MeanBackward0</code></pre>
+    <p>Seguendo i <code>grad_fn</code> all'indietro dalla loss si ricostruisce tutto il percorso. Le <strong>foglie</strong> sono quello che hai creato tu — e solo loro riceveranno un <code>.grad</code>, come hai visto in M02.</p>
+  </div>
+</div>
+
+<div class="note ponte">
+  <div class="mark">Ponte<br>parziale</div>
+  <div class="body">
+    <p>Il grafo somiglia a un DAG di dipendenze: ogni nodo sa da chi dipende, e si risale all'indietro.</p>
+    <p><strong>Dove si rompe:</strong> un DAG di build è statico e lo puoi ispezionare prima di eseguirlo. Qui il grafo <strong>si costruisce mentre esegui</strong> ed è diverso a ogni passata — un <code>if</code> nel codice del modello produce grafi diversi su batch diversi. Non puoi guardarlo prima: puoi solo guardare quello che è appena stato costruito.</p>
+  </div>
+</div>
+
+<div class="note lab">
+  <div class="mark">Lab 07.1<br>backward</div>
+  <div class="body">
+    <pre><code>python3 corso/labs/lab_07_1_backward.py</code></pre>
+    <p>Sezioni 1–3 su CPU, girano sul portatile. Sezioni 4–5 <strong>richiedono CUDA</strong>: senza, si fermano con un messaggio esplicito invece di stampare numeri stimati.</p>
+    <p><strong>Le sezioni 4–5 non sono mai state eseguite</strong> nemmeno da chi ha scritto il corso: il fermo pulito è verificato, i numeri su hardware vero no. Se hai una GPU, il lab accetta <code>--registra</code> e <code>--confronta</code> — la matrice di cosa è stato provato e dove sta in <code>corso/AMBIENTI.md</code>.</p>
+    <p><strong>Quello che il corso prevede, e che puoi smentire:</strong></p>
+    <ul>
+      <li>il picco <em>con</em> gradient checkpointing sarà <strong>minore</strong> che senza, e il tempo per passo <strong>maggiore</strong>. Mi smentisci se una delle due va nella direzione opposta;</li>
+      <li>il <code>k</code> effettivo ricavato dal picco totale sarà <strong>maggiore di 1</strong>, perché quel picco include anche pesi, gradienti e stati optimizer, non solo le attivazioni. Mi smentisci se viene ≤ 1: vorrebbe dire che sto contando male il denominatore.</li>
+    </ul>
+    <p>Nota che <strong>non prevedo di quanto</strong>. Il risparmio e il costo dipendono da architettura, dtype e stack, e un numero inventato sarebbe peggio di nessun numero. La direzione sì, quella è una conseguenza del meccanismo, e se sbagliata il modulo è sbagliato.</p>
+  </div>
+</div>
+
+<h2>La crescita, misurata</h2>
+
+<p>Il lab non somma byte a mano: <strong>cammina il grafo di autograd</strong> partendo dalla loss, raccoglie tutti i tensori trattenuti e li deduplica per indirizzo di memoria. È una misura, non un modello.</p>
+
+<h3>Rete di soli strati lineari</h3>
+
+<pre data-lab="lab_07_1"><code>I pesi trattenuti sono un termine COSTANTE: 2.10 MB
+
+ batch    seq  batch*seq   MB totali    - pesi  = attivaz.
+     1    128        128        3.28      2.10        1.18   (1x)
+     2    128        256        4.46      2.10        2.36   (2x)
+     1    256        256        4.46      2.10        2.36   (2x)
+     4    256       1024       11.53      2.10        9.44   (8x)
+     2    512       1024       11.53      2.10        9.44   (8x)</code></pre>
+
+<p><strong>Guarda l'ultima colonna, non la prima.</strong> Il totale grezzo non raddoppia perché contiene la costante dei pesi, che sono trattenuti anche loro ma non dipendono né dal batch né dalla sequenza. Isolata quella, le attivazioni scalano esattamente: 1×, 2×, 2×, 8×, 8×.</p>
+
+<p>È lo stesso principio che troverai due sezioni più sotto: una costante additiva nasconde l'andamento, quindi si guarda come varia il totale, non il totale. Qui posso separarla perché la <em>conosco</em> — su un modello vero la calcoli con l'aritmetica di M06.</p>
+
+<p>Le righe con lo stesso <code>batch × seq</code> coincidono: qui conta il prodotto, non come lo ottieni.</p>
+
+<h3>Con attention esplicita</h3>
+
+<div class="note errore">
+  <div class="mark">Dove il<br>«solo batch × seq»<br>è falso</div>
+  <div class="body">
+    <p>Quella intercambiabilità vale per la rete qui sopra, fatta di soli strati lineari. <strong>Non è una legge generale.</strong></p>
+    <pre style="margin:10px 0" data-lab="lab_07_1"><code> batch    seq  batch*seq   MB trattenuti
+     1    128        128            1.70
+     2    128        256            2.62
+     1    256        256            3.15   ← non coincide con la riga sopra
+     4    256       1024           10.22
+     2    512       1024           14.42   ← nemmeno qui</code></pre>
+    <p>L'attention classica costruisce una matrice di punteggi <code>[batch, teste, seq, seq]</code>, che cresce col <strong>quadrato della sequenza</strong>. Raddoppiare <code>seq</code> quadruplica quel termine; raddoppiare il batch lo raddoppia soltanto. A parità di <code>batch × seq</code>, la sequenza costa di più.</p>
+    <p><strong>E dipende anche dal kernel:</strong> le implementazioni tipo FlashAttention non materializzano quella matrice, riportando il termine a lineare. Quindi la risposta corretta alla domanda «raddoppiare la sequenza o il batch è lo stesso?» è: <em>dipende dall'architettura e dall'implementazione — misuralo sul tuo stack</em>.</p>
+  </div>
+</div>
+
+<h2>Gradient checkpointing</h2>
+
+<div class="note nozione">
+  <div class="mark">Nozione</div>
+  <div class="body">
+    <p>Se il problema è che ogni strato trattiene il suo ingresso, la soluzione è ovvia: <strong>non trattenerli</strong>. Ne conservi solo alcuni — i <em>checkpoint</em> — e quando il calcolo all'indietro arriva a un pezzo mancante, <strong>rifà in avanti</strong> quella porzione per ricostruirlo.</p>
+    <p>Meno memoria, più calcolo. Non è un trucco gratis: è un baratto esplicito.</p>
+  </div>
+</div>
+
+<div class="note prevedi">
+  <div class="mark">Prevedi<br>prima del lab</div>
+  <div class="body">
+    <p>Prima di lanciare la sezione 4 sul nodo, <strong>scrivi due numeri</strong>:</p>
+    <ul>
+      <li>Memoria risparmiata: <strong>____%</strong></li>
+      <li>Tempo in più per step: <strong>____%</strong></li>
+    </ul>
+    <p>Un ragionamento per arrivarci: se ricalcoli il forward di ogni blocco, quante volte in totale esegui il forward rispetto a prima? E quanto pesa il forward rispetto al backward?</p>
+  </div>
+</div>
+
+<details class="risposta">
+  <summary>Come ragionare (non è il risultato — quello lo misuri tu)</summary>
+  <div class="risposta-inner">
+    <p>Un passo normale è: un forward più un backward. Il backward costa grossomodo il doppio del forward, quindi il passo vale circa <strong>3 unità</strong> di lavoro.</p>
+    <p>Col checkpointing rifai il forward dei blocchi durante il ritorno: aggiungi circa <strong>1 unità</strong>. Da 3 a 4 unità significa <strong>circa +33%</strong> di tempo, come ordine di grandezza.</p>
+    <p>Sul risparmio di memoria non do una previsione: dipende da quanti checkpoint metti e da quanto pesano le attivazioni rispetto a pesi, gradienti e stati dell'optimizer, che <em>non</em> vengono toccati. Su un modello con LoRA, dove lo statico è piccolo, il risparmio percentuale sarà molto più grande che su un full fine-tuning, dove lo statico domina.</p>
+    <p><strong>Questo è il punto della previsione:</strong> non indovinare il numero, ma sapere <em>da cosa dipende</em>. Se la tua misura si discosta molto da «+33%», la spiegazione è nei dettagli — quali blocchi hai marcato, quanto sono grandi, se i kernel sono fusi.</p>
+  </div>
+</details>
+
+<div class="note errore">
+  <div class="mark">Quello che il<br>checkpointing NON fa</div>
+  <div class="body">
+    <p>Non tocca pesi, gradienti e stati dell'optimizer: quelli restano interi. Agisce solo sulla quinta voce di M06.</p>
+    <p>Quindi se il tuo problema di memoria è <em>statico</em> — il modello con il suo optimizer non ci sta comunque — il checkpointing non ti salva.</p>
+    <p><strong>Ma non dedurlo da un errore di memoria.</strong> Un errore anche con <code>batch=1</code> <em>non prova</em> che il costo sia statico: con sequenze lunghe e attention quadratica un solo esempio può occupare moltissimo, e lì il checkpointing aiuta eccome.</p>
+    <p><strong>E non puoi nemmeno misurarlo sulla GPU</strong>, per un motivo circolare: se il termine statico non ci sta, l'errore di memoria arriva <em>mentre</em> lo allochi, prima che tu possa leggerlo. E <code>memory_allocated()</code> non può per costruzione riportare un valore superiore alla capacità della scheda. Una misura sul dispositivo può confermare i casi che <em>ci stanno</em>, mai quantificare quelli che non ci stanno.</p>
+    <p><strong>Il termine statico si calcola, non si misura</strong> — ed è esattamente quello che hai imparato a fare in M06, senza accendere una GPU:</p>
+    <pre style="margin:10px 0"><code>statico = parametri × byte_pesi
+        + addestrabili × (byte_gradienti + byte_stati + byte_master)</code></pre>
+    <p>I parametri li conti dal checkpoint come in M04, leggendo solo l'intestazione. Se quel numero supera già il tetto della GPU, hai la risposta senza aver lanciato niente: nessuna riduzione di batch o sequenza ti salverà, e devi cambiare metodo o partizionare (M18).</p>
+    <p>Se invece lo statico ci sta con margine, il problema è nelle attivazioni: riduci la <strong>sequenza</strong>, che a differenza del batch può ancora scendere fino a poche decine di token, e verifica che l'errore sparisca. Quello è un test diretto ed eseguibile.</p>
+  </div>
+</div>
+
+<h2>Ricavare il <code>k</code> del tuo stack</h2>
+
+<p>La formula di M06 aveva un fattore <code>k</code> che ho dichiarato non universale. La sezione 5 del lab lo <strong>misura</strong> sul tuo hardware e sulla tua versione di libreria: confronta la stima col picco reale.</p>
+
+<p>È il passaggio che rende la formula utilizzabile. Una volta che conosci il <code>k</code> effettivo della tua architettura, le previsioni successive diventano affidabili — e puoi tornare a M06 e rifare i conti sul 27B con un numero tuo invece che con una stima.</p>
+
+<div class="note errore">
+  <div class="mark">Come isolare<br>le attivazioni</div>
+  <div class="body">
+    <p>Il picco misurato include <em>tutto</em>: pesi, gradienti, stati dell'optimizer, attivazioni. Dividerlo per il termine delle attivazioni dà un <code>k</code> contaminato.</p>
+    <p>Il metodo empirico è misurare il picco a più valori di batch e prendere la <strong>pendenza</strong>: lo statico è una costante additiva e sparisce nella differenza fra due misure.</p>
+    <p><strong>Ma va usato con due condizioni esplicite, altrimenti mente:</strong></p>
+    <ul>
+      <li><strong>Solo dove i run completano.</strong> Serve un intervallo di batch che girano tutti senza errore di memoria. Non è un metodo per capire perché un run fallisce — per quello c'è il calcolo di M06.</li>
+      <li><strong>Verifica la linearità, non assumerla.</strong> Usa almeno tre punti e controlla che gli incrementi siano costanti. Se non lo sono, la pendenza non è un numero solo: possono esserci termini quadratici (l'attention), soglie di allocazione o frammentazione. In quel caso hai imparato qualcosa di più utile del <code>k</code>.</li>
+    </ul>
+    <p>Con quelle condizioni la pendenza è una <strong>stima empirica valida nell'intervallo misurato</strong> — non una legge, e non una prova su cosa succede fuori da quell'intervallo.</p>
+  </div>
+</div>
+
+<h2>Verifica</h2>
+
+<ol>
+  <li>Perché <code>x * 2</code> non trattiene <code>x</code> mentre <code>x.exp()</code> trattiene qualcosa?</li>
+  <li><code>batch=8, seq=512</code> e <code>batch=2, seq=2048</code>: quale consuma più memoria di attivazioni?</li>
+  <li>Il gradient checkpointing riduce la memoria degli stati dell'optimizer?</li>
+  <li>Vai in errore di memoria con <code>batch=1</code> e sequenza 128. Il checkpointing ti aiuta? Cosa ti dice quel sintomo?</li>
+  <li>Vuoi misurare il costo delle sole attivazioni, senza lo statico. Come imposti la misura?</li>
+</ol>
+
+<details class="risposta">
+  <summary>Mostra le risposte</summary>
+  <div class="risposta-inner">
+    <p><strong>1.</strong> La derivata di <code>2x</code> è la costante 2: non dipende da <code>x</code>, quindi <code>x</code> è inutile al ritorno. La derivata di <code>eˣ</code> è <code>eˣ</code>: dipende dal valore, e conviene trattenere l'uscita già calcolata invece di rifare l'esponenziale.</p>
+    <p><strong>2.</strong> <strong>Dipende dall'architettura.</strong> Entrambi danno <code>batch × seq = 4096</code>, quindi per gli strati lineari sono equivalenti. Ma se l'attention materializza la matrice <code>[batch, teste, seq, seq]</code>, <code>seq=2048</code> costa molto di più: quel termine cresce col quadrato della sequenza. Con kernel che non la materializzano, torna lineare. Da misurare, non da dedurre.</p>
+    <p><strong>3.</strong> <strong>No.</strong> Agisce solo sulle attivazioni. Pesi, gradienti e stati dell'optimizer restano interi.</p>
+    <p><strong>4.</strong> <strong>Non lo sai ancora, e la domanda ha una premessa insidiosa.</strong> Un errore a <code>batch=1</code> non prova che il costo sia statico: con sequenze lunghe e attention quadratica un solo esempio può occupare moltissimo, e il checkpointing aiuterebbe. E non puoi misurarlo sulla GPU: se lo statico non ci sta, l'errore arriva mentre lo allochi. <strong>Il termine statico si calcola</strong> con l'aritmetica di M06 sui parametri letti dal checkpoint — nessuna GPU necessaria. Se supera il tetto, il problema è statico. Se ci sta, riduci la sequenza e verifica.</p>
+    <p><strong>5.</strong> Misuri il picco ad <strong>almeno tre</strong> valori di batch che completano tutti senza errore, tenendo fermo tutto il resto, e prendi la <strong>pendenza</strong>: lo statico è una costante additiva e sparisce nella differenza. Ma prima <strong>verifichi che gli incrementi siano davvero costanti</strong> — se non lo sono, non esiste una pendenza sola e stai guardando un termine quadratico o un effetto dell'allocatore. La stima vale solo dentro l'intervallo misurato.</p>
+  </div>
+</details>
+
+<div class="pagenav" id="pagenav"></div>
+
+</main>
+</div>
+<script src="assets/profilo.js"></script>
+<script src="assets/nav.js"></script>
+</body>
+</html>
