@@ -31,57 +31,82 @@ PY = sys.executable
 PROVE = []
 
 
-def prova(nome, file_da_rompere, rompi, comando, atteso=1):
-    """Rompe, lancia, verifica il codice di uscita, ripristina SEMPRE."""
-    PROVE.append((nome, file_da_rompere, rompi, comando, atteso))
+def prova(nome, file_da_rompere, rompi, comando, firma):
+    """`firma` e' cio' che il rapporto DEVE nominare quando il difetto c'e'.
+
+    Il codice di uscita da solo non basta, ed e' il secondo difetto che
+    questo file ha avuto. Su una macchina dove il gate fallisce gia' a
+    riposo — la CI, dove la CPU non e' quella di riferimento — iniettare
+    una mutazione lascia l'uscita a 1 comunque, e la prova passa senza
+    aver dimostrato niente.
+
+    Quindi si verificano due cose insieme:
+      - col difetto:   il rapporto NOMINA la mutazione
+      - senza difetto: il rapporto NON la nomina
+    E' la differenza fra 'il controllo era rosso' e 'il controllo ha
+    visto QUESTO'.
+    """
+    PROVE.append((nome, file_da_rompere, rompi, comando, firma))
 
 
 # ----------------------------------------------------------------------
 prova("gate numerico: un numero che nessun lab produce",
       "m20-parity.html",
       lambda t: t.replace("7.727e-03", "9.999e-03", 1),
-      [PY, "verifica.py", "--brevi"])
+      [PY, "verifica.py"],
+      firma="9.999e-03")
 
 prova("copertura: un blocco senza data-lab",
       "m20-parity.html",
       lambda t: t.replace('<pre data-lab="lab_20_1">', "<pre>", 1),
-      [PY, "verifica.py", "--copertura", "--brevi"])
+      [PY, "verifica.py", "--copertura"],
+      firma="m20-parity.html blocco #")
 
 prova("parity: conti.js che diverge dal lab",
       "assets/conti.js",
       lambda t: t.replace("adamw8bit: 2", "adamw8bit: 3", 1),
-      [PY, "tools/parity_conti.py"])
+      [PY, "tools/parity_conti.py"],
+      firma="DIVERGONO")
 
 
 # ----------------------------------------------------------------------
 def esegui(comando):
     r = subprocess.run(comando, cwd=QUI, capture_output=True, text=True)
-    return r.returncode
+    return r.returncode, r.stdout + r.stderr
 
 
-print("Provo che i gate sappiano fallire.\n")
-print(f"  {'prova':<48} {'atteso':>7} {'ottenuto':>9}")
+print("Provo che i gate vedano il difetto, non solo che diventino rossi.\n")
+print(f"  {'prova':<46} {'uscita':>7} {'nomina?':>9} {'tace?':>7}")
 
 falliti = 0
-for nome, rel, rompi, comando, atteso in PROVE:
+for nome, rel, rompi, comando, firma in PROVE:
     f = QUI / rel
     originale = f.read_text()
+
+    # 1. col difetto
     try:
         rotto = rompi(originale)
         if rotto == originale:
-            print(f"  {nome:<48} {'—':>7} {'NON ROTTO':>9}")
+            print(f"  {nome:<46} {'—':>7} {'NON ROTTO':>9}")
             print(f"      la modifica non ha cambiato {rel}: la prova non "
                   f"dimostra niente")
             falliti += 1
             continue
         f.write_text(rotto)
-        uscita = esegui(comando)
+        uscita, out_rotto = esegui(comando)
     finally:
         f.write_text(originale)
 
-    ok = uscita == atteso
+    # 2. senza difetto: la firma NON deve comparire, altrimenti la prova
+    #    passerebbe anche senza aver visto la mutazione
+    _, out_integro = esegui(comando)
+
+    nomina = firma in out_rotto
+    tace = firma not in out_integro
+    ok = uscita == 1 and nomina and tace
     falliti += not ok
-    print(f"  {nome:<48} {atteso:>7} {uscita:>9} {'' if ok else '  <- NON SE NE ACCORGE'}")
+    print(f"  {nome:<46} {uscita:>7} {'si' if nomina else 'NO':>9}"
+          f" {'si' if tace else 'NO':>7}{'' if ok else '   <- NON DIMOSTRA'}")
 
 # A corso integro devono tacere. Ma non tutti allo stesso titolo:
 #
@@ -101,7 +126,7 @@ for nome, comando, dipende_da_cpu in [
         ("copertura", [PY, "verifica.py", "--copertura", "--brevi"], False),
         ("parity", [PY, "tools/parity_conti.py"], False),
         ("gate numerico", [PY, "verifica.py", "--brevi"], True)]:
-    u = esegui(comando)
+    u, _ = esegui(comando)
     if dipende_da_cpu and not RIFERIMENTO:
         stato = "ok" if u == 0 else "diverge (atteso fuori dal riferimento)"
         print(f"  {'a corso integro: ' + nome:<48} {'—':>7} {u:>9}   {stato}")

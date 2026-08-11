@@ -18,8 +18,12 @@ Non fa parte del corso: è manutenzione.
 docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/prova_i_gate.py --riferimento
 ```
 
-Rompe una cosa alla volta e verifica che il controllo corrispondente se ne accorga,
-poi ripristina. Va **prima** degli altri: un verde prodotto da un controllo che non
+Rompe una cosa alla volta e verifica che il controllo corrispondente **nomini la
+mutazione nel rapporto**, poi ripristina. Non basta guardare il codice di uscita: su
+una macchina dove il gate è già rosso a riposo — la CI, dove la CPU non è quella di
+riferimento — iniettare un difetto lascia l'uscita a 1 comunque, e la prova passerebbe
+senza aver dimostrato niente. Quindi si verificano tre cose insieme: uscita 1, il
+rapporto *nomina* la mutazione, e a corso integro *non* la nomina. Va **prima** degli altri: un verde prodotto da un controllo che non
 può fallire è peggio di nessun controllo, perché autorizza a non guardare.
 
 `--riferimento` pretende verde anche il gate numerico. Usalo **solo qui**: quel gate
