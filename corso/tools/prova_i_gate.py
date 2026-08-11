@@ -83,16 +83,39 @@ for nome, rel, rompi, comando, atteso in PROVE:
     falliti += not ok
     print(f"  {nome:<48} {atteso:>7} {uscita:>9} {'' if ok else '  <- NON SE NE ACCORGE'}")
 
-# e a corso integro devono passare tutti
+# A corso integro devono tacere. Ma non tutti allo stesso titolo:
+#
+#   copertura e parity NON dipendono dalla CPU - la prima guarda la
+#   marcatura, il secondo e' aritmetica esatta. Devono passare ovunque.
+#
+#   il gate NUMERICO dipende dalla CPU, e lo dice AMBIENTI.md: i numeri
+#   pubblicati sono l'output del container sulla macchina che li ha
+#   generati, e su un processore diverso divergono. Preteserlo verde
+#   ovunque sarebbe la stessa presunzione che questo file esiste per
+#   smontare - e infatti la prima versione lo pretendeva, e la CI l'ha
+#   colta in fallo.
+RIFERIMENTO = "--riferimento" in sys.argv
+
 print()
-for nome, comando in [("gate numerico", [PY, "verifica.py", "--brevi"]),
-                      ("copertura", [PY, "verifica.py", "--copertura", "--brevi"]),
-                      ("parity", [PY, "tools/parity_conti.py"])]:
+for nome, comando, dipende_da_cpu in [
+        ("copertura", [PY, "verifica.py", "--copertura", "--brevi"], False),
+        ("parity", [PY, "tools/parity_conti.py"], False),
+        ("gate numerico", [PY, "verifica.py", "--brevi"], True)]:
     u = esegui(comando)
+    if dipende_da_cpu and not RIFERIMENTO:
+        stato = "ok" if u == 0 else "diverge (atteso fuori dal riferimento)"
+        print(f"  {'a corso integro: ' + nome:<48} {'—':>7} {u:>9}   {stato}")
+        continue
     ok = u == 0
     falliti += not ok
     print(f"  {'a corso integro: ' + nome:<48} {0:>7} {u:>9}"
           f"{'' if ok else '  <- FALSO ALLARME'}")
+
+if not RIFERIMENTO:
+    print("""
+  Il gate numerico e' stato eseguito ma NON conteggiato: qui non si sa se
+  la CPU sia quella che ha generato i numeri. Sulla macchina di
+  riferimento va preteso verde, e li' si lancia con --riferimento.""")
 
 print()
 if falliti:

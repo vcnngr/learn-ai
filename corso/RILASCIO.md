@@ -15,12 +15,15 @@ Non fa parte del corso: è manutenzione.
 ## 0. I gate sanno fallire?
 
 ```bash
-docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/prova_i_gate.py
+docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/prova_i_gate.py --riferimento
 ```
 
 Rompe una cosa alla volta e verifica che il controllo corrispondente se ne accorga,
 poi ripristina. Va **prima** degli altri: un verde prodotto da un controllo che non
 può fallire è peggio di nessun controllo, perché autorizza a non guardare.
+
+`--riferimento` pretende verde anche il gate numerico. Usalo **solo qui**: quel gate
+dipende dalla CPU, e in CI la macchina non è quella che ha generato i numeri.
 
 Non è un'ipotesi: `verifica.py --copertura` faceva `return 0` incondizionato mentre
 la CI lo invocava dichiarandolo «controllo DURO». Se aggiungi un gate, aggiungi lì
