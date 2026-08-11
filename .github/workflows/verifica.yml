@@ -38,6 +38,13 @@ jobs:
       - name: Parity — conti.js contro lab_06_1_memoria.py
         run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/parity_conti.py
 
+      # I GATE SANNO FALLIRE? Prima domanda, non ultima.
+      # `--copertura` faceva `return 0` incondizionato mentre questa CI lo
+      # invocava chiamandolo «controllo DURO»: per due commit c'e' stato un
+      # controllo che non poteva fallire. Ora si prova, invece di crederci.
+      - name: I gate si accorgono di un difetto introdotto apposta
+        run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/prova_i_gate.py
+
       # COPERTURA: controllo DURO. Non dipende dai numeri, solo dalla
       # marcatura, quindi vale su qualunque CPU.
       - name: Copertura della marcatura data-lab

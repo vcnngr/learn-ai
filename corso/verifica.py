@@ -456,7 +456,23 @@ def main():
             print(f"      ... e altri {len(senza_marca) - 20}")
 
     if SOLO_COPERTURA:
-        return 0
+        # Esce 1 se resta anche un solo blocco non marcato.
+        #
+        # La prima versione faceva `return 0` incondizionato, e la CI lo
+        # invocava dichiarandolo «controllo DURO»: un controllo che non
+        # puo' fallire. E' il difetto tipo 2 del brief — una procedura che
+        # non puo' produrre la risposta che le si chiede — commesso nel
+        # controllo che avrebbe dovuto trovarlo negli altri.
+        if non_marcati:
+            print(f"""
+  {non_marcati} blocchi senza data-lab. Ognuno viene confrontato con
+  l'unione di tutti i lab invece che col proprio, ed e' una rete cosi'
+  larga da lasciar passare quasi tutto: e' esattamente cosi' che M13
+  ha pubblicato per settimane una perplessita' che nessun lab produceva.
+
+  Marcali con data-lab="lab_NN_M", o con data-lab="nessuno" se
+  deliberatamente non vengono da un lab.""")
+        return 1 if non_marcati else 0
 
     print(f"\n{'=' * 74}")
     print(f"numeri nei blocchi non trovati : {tot_b}")
