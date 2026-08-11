@@ -43,12 +43,12 @@
   <div class="risposta-inner">
     <pre data-lab="lab_13_1"><code>regime                            ppl fatti   R: visti  R: nascosti
 solo continued pretraining             1.08         0%           0%
-solo SFT                           87539.80       100%           0%
-CPT poi SFT                          650.67       100%           0%
+solo SFT                           87539.88       100%           0%
+CPT poi SFT                          676.87       100%           0%
 CPT poi SFT+replay dei fatti           1.08       100%           0%</code></pre>
     <p><strong>1. Sì</strong>, 100%.</p>
     <p><strong>2. No. Zero per cento</strong> — in tutti e quattro i regimi, replay compreso.</p>
-    <p><strong>3.</strong> Molto peggio: la perplessità passa da <strong>1,08</strong> a <strong>651</strong>. La fase SFT ha <em>cancellato</em> quello che la prima aveva imparato.</p>
+    <p><strong>3.</strong> Molto peggio: la perplessità passa da <strong>1,08</strong> a <strong>677</strong>. La fase SFT ha <em>cancellato</em> quello che la prima aveva imparato.</p>
   </div>
 </details>
 
@@ -84,7 +84,7 @@ SFT (solo risposta)                  214              64     30%</code></pre>
 <h2>Primo risultato scomodo: la sequenza ingenua dimentica</h2>
 
 <pre data-lab="lab_13_1"><code>dopo il continued pretraining     ppl 1.08
-dopo la fase SFT                  ppl 651</code></pre>
+dopo la fase SFT                  ppl 677</code></pre>
 
 <p>La seconda fase ha cancellato la conoscenza della prima. È il <strong>catastrophic forgetting</strong> di M12, misurato qui in un lab che gira in dieci secondi — non un rischio teorico.</p>
 
@@ -155,7 +155,7 @@ Entrambi          -> CPT, poi SFT CON replay dei dati grezzi,
   <div class="risposta-inner">
     <p><strong>1.</strong> Probabilmente stai usando l'SFT come veicolo principale di <em>conoscenza</em>, ed è inefficiente: supervisiona meno token a parità di corpus. Il continued pretraining sul testo di dominio ne estrae di più. Ma verifica prima che il problema sia davvero la conoscenza e non la copertura del formato — sono due cose diverse e il lab le separa.</p>
     <p><strong>2.</strong> Perché supervisiona <em>ogni</em> token, mentre l'SFT esclude il prompt. Nel lab: 100% contro 30%, cioè 6,9 volte più segnale.</p>
-    <p><strong>3.</strong> La perplessità sul testo di dominio <strong>prima e dopo</strong> la fase SFT — è così che si vede il forgetting (1,08 → 651). E la capacità di rispondere su fatti visti solo in forma grezza, che è il trasferimento fra formati.</p>
+    <p><strong>3.</strong> La perplessità sul testo di dominio <strong>prima e dopo</strong> la fase SFT — è così che si vede il forgetting (1,08 → 677). E la capacità di rispondere su fatti visti solo in forma grezza, che è il trasferimento fra formati.</p>
     <p><strong>4.</strong> <strong>No.</strong> Ha risolto il forgetting, non il trasferimento: i fatti visti solo come testo grezzo restano allo 0%. Due problemi distinti, due misure distinte.</p>
     <p><strong>5.</strong> Continued pretraining sui documenti, <em>più</em> un insieme di domande e risposte costruito su quegli stessi documenti — perché il trasferimento fra formati non è automatico. E un replay durante l'SFT. Poi misuri entrambe le cose separatamente.</p>
   </div>

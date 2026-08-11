@@ -24,28 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Installa lo stack dichiarato
-        run: |
-          python -m pip install --upgrade pip
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2
-          pip install numpy==1.26.4 safetensors
+      # Il gate gira DENTRO il container di riferimento, non con un pip
+      # install che gli somiglia. Il primo tentativo installava le stesse
+      # versioni sul runner e falliva lo stesso: il runner ha 2 core, la
+      # macchina di sviluppo 16, e il numero di thread cambia l'ordine
+      # delle riduzioni BLAS. Se l'ambiente e' un artefatto, va USATO.
+      - name: Costruisci l'ambiente di riferimento
+        run: docker build -t learn-ai .
 
       - name: Dichiara l'ambiente
-        run: python3 corso/labs/lab_00_1_ambiente.py
+        run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/labs/lab_00_1_ambiente.py
 
       - name: Parity — conti.js contro lab_06_1_memoria.py
-        run: python3 corso/tools/parity_conti.py
+        run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/tools/parity_conti.py
 
       - name: Gate — ogni numero pubblicato risale a un lab
-        run: python3 corso/verifica.py
+        run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/verifica.py
 
   # ------------------------------------------------------------------
   # AMBIENTE RECENTE — quello che sulla macchina di scrittura NON si può

@@ -32,6 +32,21 @@ Stessi semi, stesso codice, BLAS diverso. Alcune divergenze sono all'ultimo bit
 (`6620.82` → `6620.85`), altre no (`332.79` → `294.84`): una differenza minima all'inizio,
 amplificata su ventimila passi di addestramento.
 
+### E non bastava pinnare le versioni
+
+Il primo container ancora non riproduceva la CI. Il motivo era il **numero di thread**:
+il runner GitHub ne ha 2, la macchina di sviluppo 16, e il conteggio dei thread cambia
+l'**ordine delle riduzioni** in BLAS — che in virgola mobile non è commutativo.
+
+```
+OMP_NUM_THREADS=1  MKL_NUM_THREADS=1  OPENBLAS_NUM_THREADS=1
+```
+
+Con un thread solo la riduzione è sequenziale e il risultato smette di dipendere da quanti
+core ha la macchina. È nel `Dockerfile`, ed è la riga meno ovvia di tutto il file.
+
+Le divergenze fra macchine sono passate da **42 a 0**. Non «quasi zero»: zero.
+
 **È la lezione di M15 avverata sul corso stesso:** i semi sono condizione necessaria, non
 sufficiente. La contromisura è quella che M15 insegna — dichiarare l'ambiente — portata
 alle sue conseguenze: l'ambiente diventa un **artefatto versionato**, non una macchina.

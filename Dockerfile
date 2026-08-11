@@ -32,6 +32,21 @@ RUN pip install --no-cache-dir \
       numpy==1.26.4 \
       safetensors==0.8.0
 
+# UN SOLO THREAD, ed e' la parte meno ovvia di questo file.
+#
+# La CI ha scoperto che lo stesso container su una macchina a 2 core e su
+# una a 16 produce numeri diversi: il numero di thread cambia l'ORDINE
+# delle riduzioni in BLAS, e in virgola mobile l'ordine conta. Pinnare
+# torch e numpy non basta se non si pinna anche quello.
+#
+# Con un thread solo la riduzione e' sequenziale e il risultato non
+# dipende piu' da quanti core ha la macchina. Costa in velocita' su
+# hardware grande; su questi lab, che lavorano su tensori minuscoli,
+# la differenza e' trascurabile.
+ENV OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1
+
 WORKDIR /corso
 
 # Dichiara sé stesso all'avvio, invece di lasciarlo indovinare.
