@@ -127,10 +127,16 @@ print(f"""  {len(NOMI)} servizi, ognuno con una porta di quattro cifre. Il compi
 # Costruzione degli artefatti del caso. Il "bug" e' qui dentro, e il
 # lettore non ha bisogno di leggerlo: lo trovera' con la diagnosi.
 
-def addestra_base(passi_grezzi=600, passi_qr=900):
+def addestra_base(passi_grezzi=10 * len(NOMI), passi_qr=15 * len(NOMI)):
     """Il modello DI PARTENZA: conosce i fatti e sa gia' rispondere nel
     formato D/R. Non e' perfetto, ma funziona - e' lo stato da cui si
-    parte quando si aggiunge un fine-tuning, non una tabula rasa."""
+    parte quando si aggiunge un fine-tuning, non una tabula rasa.
+
+    I passi sono PROPORZIONALI al numero di servizi, non costanti: con
+    un dataset tre volte piu' grande e gli stessi passi il modello non
+    memorizza abbastanza, il caso perde il sintomo e il fine-tuning
+    sembra migliorare. Legare le due cose evita che il caso si rompa in
+    silenzio la prossima volta che si cambia la taglia."""
     torch.manual_seed(1)
     m = Mini(V)
     opt = torch.optim.AdamW(m.parameters(), lr=3e-3)
@@ -165,8 +171,15 @@ def maschera(n_prompt, n_tot, sfasamento):
     return m
 
 
-def sft(base, sfasamento, passi=900):
-    """SFT con maschera sulla sola risposta. `sfasamento` e' il difetto."""
+def sft(base, sfasamento, passi=40 * len(NOMI)):
+    """SFT con maschera sulla sola risposta. `sfasamento` e' il difetto.
+
+    40 passi per servizio, non 15: con un fine-tuning breve il modello
+    conserva quello che il base gli aveva insegnato sulla prima cifra,
+    il sintomo resta debole e l'intervallo del passo zero si avvicina
+    allo zero. Un margine sottile e' proprio cio' che si e' rotto
+    cambiando piattaforma: qui il fine-tuning gira abbastanza da
+    sovrascrivere davvero, come farebbe uno vero."""
     import copy
     torch.manual_seed(2)
     m = copy.deepcopy(base)
@@ -215,8 +228,21 @@ print(f"  IC 95% della differenza    [{lo:+.3f}, {hi:+.3f}]")
 
 contiene_zero = lo <= 0 <= hi
 print(f"  l'intervallo contiene lo zero?  {'SI' if contiene_zero else 'NO'}")
+if contiene_zero:
+    raise SystemExit(f"""
+  VERDETTO DEL PASSO ZERO: MI FERMO QUI.
+
+  L'intervallo [{lo:+.3f}, {hi:+.3f}] contiene lo zero: non ho evidenza
+  sufficiente per attribuire una causa, e proseguire con le ipotesi
+  sarebbe interpretare rumore.
+
+  E questo lab si ferma DAVVERO, invece di dirlo e andare avanti. Se
+  lo vedi, non e' una simulazione didattica: il caso e' sotto-dimensionato
+  su questa piattaforma. La risposta corretta e' piu' esempi, non piu'
+  ipotesi -> M12, sezione 5.""")
+
 print(f"""
-  VERDETTO DEL PASSO ZERO: {"mi fermo qui" if contiene_zero else "c'e' un fenomeno, proseguo"}.
+  VERDETTO DEL PASSO ZERO: c'e' un fenomeno, proseguo.
 
   Nota cosa NON ho fatto: non ho guardato la training loss. Scende in
   tutti gli scenari rotti costruiti nel corso, quindi non e' evidenza

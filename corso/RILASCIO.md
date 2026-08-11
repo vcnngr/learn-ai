@@ -14,9 +14,14 @@ Non fa parte del corso: è manutenzione.
 
 ## 1. Il gate numerico
 
+```bash
+docker build -t learn-ai .
+docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/verifica.py
 ```
-python3 corso/verifica.py
-```
+
+**Nel container, non a mano.** I numeri pubblicati sono l'output dell'ambiente di
+riferimento definito dal `Dockerfile`; lanciarlo sul proprio portatile produce
+divergenze che non sono difetti del corso — vedi `AMBIENTI.md`.
 
 Esce con **0** se ogni numero pubblicato risale a un output di lab, con **1**
 altrimenti. Non pubblicare con uscita 1 senza aver letto ogni riga del rapporto.

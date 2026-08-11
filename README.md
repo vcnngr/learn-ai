@@ -23,8 +23,14 @@ Non è una dichiarazione d'intenti: è controllata da uno script, e il controllo
 fallisce il rilascio.
 
 ```bash
-python3 corso/verifica.py
+docker build -t learn-ai .
+docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/verifica.py
 ```
+
+L'ambiente di riferimento è un **container versionato**, non una macchina: lo
+stesso `torch 2.2.2` su Linux e su macOS produce numeri diversi in tutti i lab
+che addestrano — stessi semi, BLAS diverso. È la lezione di M15 avverata sul
+corso stesso, e la contromisura è dichiarare l'ambiente fino in fondo.
 
 Esegue i 27 lab, estrae ogni numero dalle pagine e verifica che risalga a un
 output reale. Ogni blocco di output è legato al suo lab con `data-lab="..."`, e

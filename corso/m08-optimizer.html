@@ -127,9 +127,9 @@ Adam                      0.05     0.021464     0.021464    0.030354</code></pre
     <p><strong>La loss finale non è la metrica giusta</strong>, e il primo tentativo di questo lab lo sbagliava: confrontava i valori finali e non mostrava nulla di interessante. Il fenomeno sta nel <strong>picco iniziale</strong>.</p>
     <pre data-lab="lab_08_1"><code>    lr    senza warmup: picco    con warmup(15): picco
   0.05                  55.91                     1.04
-   0.1                6620.82                     1.37
-   0.2              112643.40                   332.79
-   0.5           191583200.00                 16551.92</code></pre>
+   0.1                6620.85                     1.37
+   0.2              112640.98                   294.84
+   0.5           191583168.00                  3003.45</code></pre>
     <p>Tutti partono da una loss di circa <strong>1,0</strong>. Senza warmup, a <code>lr=0,1</code> la loss schizza a <strong>6 620</strong> prima di riprendersi. Con warmup resta a <strong>1,37</strong>.</p>
     <p><strong>Il meccanismo:</strong> all'inizio gli stati di Adam sono vuoti. Le sue stime della scala del gradiente sono costruite su uno o due campioni, quindi inaffidabili — e il passo che ne esce può essere enorme. Il warmup gli dà il tempo di riempirsi prima di fidarsene.</p>
     <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Perché su un modello grande è peggio.</strong> Qui il picco si riassorbe: dopo 60 passi la loss finale è simile nei due casi. Su un modello grande quei primi passi possono spostare i pesi così lontano da non tornare più — e il log non mostra nessun errore, solo un addestramento che poi rende meno del previsto.</p>

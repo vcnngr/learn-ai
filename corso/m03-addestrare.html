@@ -218,17 +218,17 @@ Col ciclo corretto:  0.01124, e ferma.</code></pre>
 
 <pre data-lab="lab_03_2"><code>  passo   loss ADDESTRAMENTO   loss TENUTI DA PARTE
       0             0.521515               0.520761
-   4000             0.002754               0.022311   ← minimo
-   8000             0.002319               0.033685
-  12000             0.002067               0.042991
-  16000             0.001874               0.050361
-  20000             0.001765               0.056741
+   4000             0.002754               0.022268   ← minimo
+   8000             0.002314               0.033673
+  12000             0.002054               0.042422
+  16000             0.001874               0.050354
+  20000             0.002556               0.058147
 
-addestramento:    0.521515 → 0.001765  =  295× meglio
-tenuti da parte:  minimo 0.022311 al passo 4.000
-                  finale 0.056741      =  2.5× PEGGIO del suo minimo</code></pre>
+addestramento:    0.521515 → 0.002556  =  204× meglio
+tenuti da parte:  minimo 0.022268 al passo 4.000
+                  finale 0.058147      =  2.6× PEGGIO del suo minimo</code></pre>
 
-<p>La colonna di sinistra <strong>scende sempre</strong>. Quella di destra tocca il minimo al passo 4.000 e poi risale: a fine corsa è <strong>2,5 volte peggiore del proprio minimo</strong>. Il modello sta diventando misurabilmente peggiore mentre il numero che guardi migliora.</p>
+<p>La colonna di sinistra <strong>scende sempre</strong>. Quella di destra tocca il minimo al passo 4.000 e poi risale: a fine corsa è <strong>2,6 volte peggiore del proprio minimo</strong>. Il modello sta diventando misurabilmente peggiore mentre il numero che guardi migliora.</p>
 
 <p>Nota anche il passo 0: le due loss sono quasi identiche (<code>0,5215</code> e <code>0,5208</code>). All'inizio il modello è ugualmente ignorante ovunque. La divergenza fra le due colonne è <em>prodotta dall'addestramento stesso</em>.</p>
 

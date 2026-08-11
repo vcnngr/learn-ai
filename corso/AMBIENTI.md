@@ -10,20 +10,47 @@ scritto perché si veda.
 
 ## Gli ambienti
 
-| # | Ambiente | torch | CUDA | GPU | Stato |
-|---|---|---|---|---|---|
-| A | macOS Intel x86_64 (macchina di scrittura) | 2.2.2 | — | — | **usato per tutto il corso** |
-| B | Linux + CUDA, torch ≥ 2.5 | — | — | — | **mai eseguito** |
+| # | Ambiente | torch | CUDA | Stato |
+|---|---|---|---|---|
+| **A** | **container `Dockerfile`** — Linux x86_64, python 3.12 | 2.2.2+cpu | — | **RIFERIMENTO: i numeri delle pagine sono il suo output** |
+| B | macOS Intel x86_64 (macchina di scrittura) | 2.2.2 | — | **diverge da A**, vedi sotto |
+| C | Linux + CUDA, torch recente | — | — | **mai eseguito** |
 
-`torch 2.2.2` non è una scelta: su macOS x86 è **l'ultima versione pubblicata**, le build
-successive non escono più per quell'architettura. È un vincolo dell'hardware di scrittura,
-non una preferenza — e produce tutte le celle vuote della colonna B.
+### Perché il riferimento è un container e non una macchina
+
+Fino all'11 agosto 2026 «ambiente di riferimento» voleva dire *il portatile su cui il corso
+è stato scritto*. Non era riproducibile da nessuno, e la CI l'ha dimostrato al primo colpo:
+lo **stesso** `torch 2.2.2` su Linux produce numeri diversi da macOS in **tutti** i lab che
+addestrano — 42 valori su 7 pagine.
+
+| | |
+|---|---|
+| Lab di pura aritmetica — memoria, forme, merge LoRA, parity | **identici** ovunque |
+| Lab che addestrano — M03, M08, M12, M13, M19, M21 | **divergono** fra piattaforme |
+
+Stessi semi, stesso codice, BLAS diverso. Alcune divergenze sono all'ultimo bit
+(`6620.82` → `6620.85`), altre no (`332.79` → `294.84`): una differenza minima all'inizio,
+amplificata su ventimila passi di addestramento.
+
+**È la lezione di M15 avverata sul corso stesso:** i semi sono condizione necessaria, non
+sufficiente. La contromisura è quella che M15 insegna — dichiarare l'ambiente — portata
+alle sue conseguenze: l'ambiente diventa un **artefatto versionato**, non una macchina.
+
+```bash
+docker build -t learn-ai .
+docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/verifica.py
+```
+
+`torch 2.2.2` resta pinnato perché è l'ultima versione installabile su macOS x86, e serve
+che chi scrive il corso possa eseguire i lab. Ma **i numeri pubblicati sono quelli del
+container**, e chi lavora su macOS deve aspettarsi che il gate segnali divergenze in locale:
+non è un difetto, è l'ambiente B che non è il riferimento.
 
 ## I rami, e dove sono stati verificati
 
-| Ramo | Dove | A (2.2.2, CPU) | B (recente, CUDA) |
+| Ramo | Dove | A (container, riferimento) | C (recente, CUDA) |
 |---|---|---|---|
-| Sezioni CPU di tutti i 27 lab | ovunque | **eseguito**, 27/27 | non necessario |
+| Sezioni CPU di tutti i 27 lab | ovunque | **eseguito**, 27/27, gate verde | non necessario |
 | `F.rms_norm` nativo | `lab_09_1`, M09 | **assente**: usato il fallback, `max\|diff\| = 0.000e+00` contro la formula di riferimento | **mai eseguito** |
 | `scaled_dot_product_attention(enable_gqa=)` | `lab_09_1`, M09 | **assente**: teste K/V espanse a mano | **mai eseguito** |
 | Picco di memoria + gradient checkpointing | `lab_07_1` sez. 4–5, M07 | **si ferma pulito** (verificato) | **mai eseguito** |
@@ -78,9 +105,9 @@ l'intestazione del file dice in cosa. Ma non tutti gli scarti si leggono allo st
 
 | File | Ambiente | Registrato |
 |---|---|---|
-| `lab_07_1_backward__cpu.txt` | A | **sì** — serve anche a collaudare il meccanismo su dati veri |
-| `lab_07_1_backward__gpu.txt` | B | no |
-| `lab_18_1_parallelismo__gpu2.txt` | B | no |
+| `lab_07_1_backward__cpu.txt` | B (macOS) | **sì** — serve anche a collaudare il meccanismo su dati veri |
+| `lab_07_1_backward__gpu.txt` | C | no |
+| `lab_18_1_parallelismo__gpu2.txt` | C | no |
 
 Il file CPU non è un riempitivo: è l'unico modo di sapere che `--registra` e `--confronta`
 funzionano davvero. Il percorso positivo, quello fuori tolleranza e quello con una chiave

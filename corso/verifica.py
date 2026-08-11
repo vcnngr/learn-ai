@@ -266,7 +266,8 @@ IGNORA = {
     "2047",       # M09: posizione oltre la finestra addestrata
     "340",        # M10: due maschere con 340 posizioni attive
     "50000",      # M11: "il validator passa su 50 000 esempi"
-    "97.5", "71.2", "73.5",   # M12: percentili e un confronto ipotetico
+    "2.5", "97.5",            # M12: il 2,5o e il 97,5o percentile del bootstrap
+    "71.2", "73.5",           # M12: un confronto ipotetico in una domanda
     "5000",       # M13: dimensione di corpus ipotetica
 }
 

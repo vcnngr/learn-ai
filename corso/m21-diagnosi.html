@@ -135,11 +135,11 @@ python3 corso/labs/lab_21_1_diagnosi.py --scheda   # solo la scheda da compilare
 <h3>Passo zero — c'è davvero un fenomeno?</h3>
 
 <pre data-lab="lab_21_2"><code>modello                      accuratezza esatta
-modello di partenza                      88.3%
-dopo il fine-tuning                      60.0%
+modello di partenza                      86.7%
+dopo il fine-tuning                      58.3%
 
 differenza appaiata                     -28.3%
-IC 95% della differenza    [-0.417, -0.167]
+IC 95% della differenza    [-0.417, -0.150]
 l'intervallo contiene lo zero?  NO</code></pre>
 
 <p>L'intervallo esclude lo zero: c'è qualcosa da spiegare, e si può procedere. Se lo avesse contenuto, la prima cosa da fare sarebbe stata ridisegnare la valutazione (M12) — non cercare una causa.</p>
@@ -170,12 +170,12 @@ quante attive: caso 3, attese 4</code></pre>
 <h3>La correzione, e la verifica che il sintomo sparisca</h3>
 
 <pre data-lab="lab_21_2"><code>modello                          accuratezza esatta
-base                                         88.3%
-SFT con maschera sfasata                     60.0%
+base                                         86.7%
+SFT con maschera sfasata                     58.3%
 SFT con maschera corretta                   100.0%
 
-differenza corretto - rotto                +40.0%
-IC 95% della differenza       [+0.283, +0.517]</code></pre>
+differenza corretto - rotto                +41.7%
+IC 95% della differenza       [+0.300, +0.550]</code></pre>
 
 <p>Stesso addestramento, <strong>una sola cosa cambiata</strong>: la maschera. Stesso seme, stessi dati, stessi passi, stesso learning rate. Una correzione che ne cambia due insieme non verifica niente — è il primo anti-pattern qui sotto.</p>
 
