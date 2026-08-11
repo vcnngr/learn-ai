@@ -1,5 +1,14 @@
 # Checklist di rilascio
 
+> **Automatizzata.** Questa checklist gira da sola a ogni push, in
+> `.github/workflows/verifica.yml`, su due ambienti: quello di riferimento
+> (`torch 2.2.2`, dove il gate deve passare) e uno recente (dove esegue per la
+> prima volta i rami che `AMBIENTI.md` dichiara mai eseguiti, e dove una
+> divergenza è un dato invece che un difetto).
+>
+> Resta scritta qui perché va capita, non solo eseguita — e perché serve
+> lanciarla in locale prima di pushare.
+
 Da eseguire **prima** di pubblicare una modifica ai lab, ai dati o all'ambiente.
 Non fa parte del corso: è manutenzione.
 

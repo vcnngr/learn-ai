@@ -1,0 +1,90 @@
+# Il gate del corso, eseguito a ogni push.
+#
+# Non è "CI perché si usa": è la checklist di RILASCIO.md resa obbligatoria.
+# Un controllo che si deve ricordare di lanciare è un controllo che prima o
+# poi non viene lanciato.
+name: verifica
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  # ------------------------------------------------------------------
+  # AMBIENTE DI RIFERIMENTO — quello su cui il corso è stato scritto.
+  # Qui il gate DEVE passare: le pagine contengono l'output prodotto da
+  # questo stack, e ogni divergenza è un difetto da correggere.
+  # ------------------------------------------------------------------
+  riferimento:
+    name: gate sull'ambiente di riferimento (torch 2.2.2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installa lo stack dichiarato
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2
+          pip install numpy==1.26.4 safetensors
+
+      - name: Dichiara l'ambiente
+        run: python3 corso/labs/lab_00_1_ambiente.py
+
+      - name: Parity — conti.js contro lab_06_1_memoria.py
+        run: python3 corso/tools/parity_conti.py
+
+      - name: Gate — ogni numero pubblicato risale a un lab
+        run: python3 corso/verifica.py
+
+  # ------------------------------------------------------------------
+  # AMBIENTE RECENTE — quello che sulla macchina di scrittura NON si può
+  # installare: su macOS x86 torch si ferma a 2.2.2.
+  #
+  # Qui girano per la prima volta i rami che AMBIENTI.md dichiara «mai
+  # eseguiti»: F.rms_norm nativo e scaled_dot_product_attention(enable_gqa=).
+  #
+  # continue-on-error: il gate PUÒ fallire, ed è informativo quando succede.
+  # Le pagine contengono l'output dell'ambiente di riferimento; se uno stack
+  # più recente produce numeri diversi, quello è un DATO — non un difetto da
+  # nascondere facendo passare il job.
+  # ------------------------------------------------------------------
+  recente:
+    name: rami mai eseguiti (torch recente) — informativo
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installa lo stack recente
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install numpy safetensors
+
+      - name: Quali rami si attivano qui
+        run: python3 corso/labs/lab_00_1_ambiente.py
+
+      - name: Parity — deve valere in ogni ambiente
+        run: python3 corso/tools/parity_conti.py
+
+      - name: Gate — le divergenze qui sono un dato, non un difetto
+        run: python3 corso/verifica.py
