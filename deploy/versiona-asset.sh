@@ -1,24 +1,48 @@
 #!/bin/sh
-# Timbra la versione negli URL degli asset: assets/x.css -> assets/x.css?v=TAG
+# Rinomina ogni asset col DIGEST DEL SUO CONTENUTO e riscrive i
+# riferimenti nelle pagine:  assets/style.css -> assets/style.a1b2c3d4.css
 #
-# Sta in uno script e non inline nel Dockerfile perche' l'espressione
-# deve contenere il carattere " e attraversare due livelli di quoting
-# (Docker RUN + shell): inline si rompeva in silenzio, e il build
-# falliva sul controllo finale invece che sulla sed.
+# PERCHE' L'HASH E NON UNA QUERY ?v=
+#
+# La query string non basta durante un rollout. Per qualche secondo
+# convivono pod vecchi e nuovi: una pagina servita dal pod NUOVO chiede
+# assets/style.css?v=NUOVO, quella richiesta puo' finire su un pod
+# VECCHIO, e nginx serve il file statico ignorando la query — quindi
+# HTML nuovo con CSS vecchio, in silenzio. E' lo stesso difetto che il
+# versionamento doveva chiudere, spostato dentro la finestra di rollout.
+#
+# Con il digest nel NOME, un pod vecchio quel file non ce l'ha e
+# risponde 404. Non e' gratis — per un istante una pagina puo' restare
+# senza stile — ma un 404 e' RUMOROSO e si risolve da solo al ricarico,
+# mentre un CSS stantio e' silenzioso e Cloudflare se lo tiene per ore.
+#
+# Cosa NON risolve: la finestra non e' zero. Con maxUnavailable: 0 dura
+# quanto ci mette il pod vecchio a uscire dal Service. E' dichiarato in
+# deploy/LEGGIMI.md invece di essere spacciato per risolto.
 set -eu
-VERSIONE="${1:?serve la versione}"
-DIR="${2:-/usr/share/nginx/html}"
+DIR="${1:-/usr/share/nginx/html}"
+A="$DIR/assets"
 
-for f in "$DIR"/*.html; do
-  # delimitatore # e non |: il | serve gia' all'alternanza (css|js),
-  # e usarlo per entrambi confonde sed prima ancora di compilare la regex
-  sed -i -E 's#(assets/[a-z]+\.(css|js))"#\1?v=SEGNAPOSTO"#g' "$f"
-  sed -i "s#?v=SEGNAPOSTO#?v=${VERSIONE}#g" "$f"
+for f in "$A"/*.css "$A"/*.js; do
+  [ -f "$f" ] || continue
+  base=$(basename "$f")
+  nome=${base%.*}
+  est=${base##*.}
+  case "$nome" in *.*) continue ;; esac        # gia' marcato, non rimarcare
+  h=$(sha256sum "$f" | cut -c1-8)
+  nuovo="${nome}.${h}.${est}"
+  mv "$f" "$A/$nuovo"
+  for p in "$DIR"/*.html; do
+    sed -i "s#assets/${base}\"#assets/${nuovo}\"#g" "$p"
+  done
+  echo "  ${base} -> ${nuovo}"
 done
 
-# Se la marcatura non ha attecchito il build deve fermarsi qui: un
-# rilascio con URL non versionati riporta il difetto che questo script
-# esiste per chiudere, e lo farebbe in silenzio.
-grep -q "style.css?v=${VERSIONE}" "$DIR/index.html"
-grep -q "tema.js?v=${VERSIONE}"   "$DIR/index.html"
-echo "asset versionati: v=${VERSIONE}"
+# Se un riferimento non marcato sopravvive, il build deve fermarsi: una
+# pagina che chiede ancora assets/style.css riporta il difetto intero.
+if grep -qE 'assets/[a-z]+\.(css|js)"' "$DIR"/*.html; then
+  echo "ERRORE: riferimenti non marcati rimasti:" >&2
+  grep -ohE 'assets/[a-z]+\.(css|js)"' "$DIR"/*.html | sort -u >&2
+  exit 1
+fi
+echo "asset marcati col digest del contenuto"

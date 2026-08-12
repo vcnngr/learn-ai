@@ -433,3 +433,8 @@ a.alloc-row:hover { background: var(--signal-wash); }
 .c-signal    { color: var(--signal); }
 .c-delta     { color: var(--delta); }
 .c-verify    { color: var(--verify); }
+
+/* Il link "successivo" della navigazione di pagina. Era uno
+   style="text-align:right" dentro innerHTML: markup, quindi bloccato
+   dalla CSP del sito insieme agli altri stili inline. */
+.pn-destra { text-align: right; }

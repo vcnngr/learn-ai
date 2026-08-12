@@ -19,23 +19,38 @@ M15, applicata al deploy.
 Sul cluster **non c'è Python**. I lab non sono nemmeno copiati nell'immagine: si
 prendono da git, dove è giusto che stiano. Chiederli via web dà 404, di proposito.
 
-## Cache: perché gli URL sono versionati
+## Cache: perché gli asset portano il digest nel nome
 
-Davanti al cluster c'è **Cloudflare**, e riscrive le intestazioni di cache
-dell'origine: un `Cache-Control: no-cache` diventa `max-age=14400` al bordo. Con
-URL stabili una release può quindi accoppiare **HTML nuovo e CSS vecchio**.
+`assets/style.css` non esiste più. Al build ogni asset viene rinominato col
+digest del proprio contenuto — `style.c109b08f.css` — e i riferimenti nelle
+pagine riscritti. Il sorgente in git resta pulito: la marcatura vive solo dentro
+l'immagine.
 
-Non è un rischio teorico: è successo al primo rilascio del toggle. Le pagine sono
-uscite senza separatori perché il CSS in cache non aveva ancora le classi nuove,
-e `cf-cache-status` diceva `HIT`.
+**Prima soluzione, insufficiente.** Avevo usato una query `?v=<tag>`. Non regge
+il rollout: per qualche secondo convivono pod vecchi e nuovi, e una pagina
+servita dal pod nuovo che chiede `style.css?v=NUOVO` a un pod vecchio riceve il
+file vecchio — nginx la query la ignora. Stesso difetto, spostato dentro la
+finestra di aggiornamento.
 
-`deploy/versiona-asset.sh` timbra la versione negli URL al momento del build —
-`assets/style.css?v=<tag>` — e un URL diverso è una risorsa diversa per qualunque
-cache, senza dover chiedere il permesso a nessuno. Il sorgente in git resta pulito:
-la marcatura esiste solo dentro l'immagine. Lo script **fallisce il build** se la
-marcatura non attecchisce, invece di produrre un'immagine con URL non versionati.
+**Perché il digest regge.** Contenuto diverso ⇒ nome diverso ⇒ URL diverso. Un
+pod vecchio quel file non ce l'ha e risponde **404**: rumoroso, e si risolve da
+solo al ricarico. Un CSS stantio invece è silenzioso, e davanti c'è Cloudflare
+che riscrive `Cache-Control` e se lo tiene per ore.
 
-## Rilasciare una versione nuova
+Con nomi immutabili gli asset possono avere `max-age=31536000, immutable`: un URL
+identifica un contenuto e basta.
+
+**Cosa NON è risolto.** La finestra di rollout non è zero. `maxUnavailable: 0`
+la riduce al tempo che un pod vecchio impiega a uscire dal Service, ma in quei
+secondi una richiesta può ancora prendere 404 su un asset. È un compromesso
+scelto: 404 che si autocorregge invece di contenuto sbagliato che persiste.
+
+**Residuo noto.** Dopo il passaggio al digest, gli URL vecchi (`assets/style.css`)
+restano in cache su Cloudflare finché non scadono — `cf-cache-status: HIT`, 404
+all'origine. È innocuo perché nessuna pagina li referenzia più, e si estingue da
+sé; ma se serve immediatezza, va purgata la cache CDN.
+
+## Rilasciare una versione nuova## Rilasciare una versione nuova
 
 ```bash
 TAG="v$(date +%Y%m%d-%H%M)"

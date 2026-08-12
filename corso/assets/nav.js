@@ -82,12 +82,24 @@ function renderAlloc() {
     html += `<${tag} class="alloc-row ${m.ok ? "" : "todo"}"${href}>
       <span class="off">${fmt(m.off)}</span>
       <span class="id">${m.tag}</span>
-      <span><span class="name">${m.t}${m.nucleo ? '<span class="nuc" title="nel percorso diagnostico">NUCLEO</span>' : ''}</span><span class="bar"><i style="width:${w}%;animation-delay:${(i * 22)}ms"></i></span></span>
+      <span><span class="name">${m.t}${m.nucleo ? '<span class="nuc" title="nel percorso diagnostico">NUCLEO</span>' : ''}</span><span class="bar"><i data-w="${w}" data-ritardo="${i * 22}"></i></span></span>
       <span class="size">${fmt(m.h)}</span>
     </${tag}>`;
   });
   html += `<div class="alloc-total"><span>${ORE.length} moduli · ${ORE.filter(m => m.ok).length} scritti</span><span>${fmt(TOT)} totali</span></div>`;
   box.innerHTML = html;
+
+  // Larghezza e ritardo sono valori CALCOLATI, quindi non possono stare
+  // in una classe. Ma nemmeno in uno style="..." dentro innerHTML: la
+  // CSP del sito ha `style-src 'self'`, e li' quello e' markup da
+  // analizzare — verrebbe bloccato, e le barre resterebbero a zero.
+  //
+  // Impostarli via CSSOM dopo l'inserimento e' un'altra cosa: non passa
+  // dal parser HTML, e la CSP non lo tocca.
+  box.querySelectorAll(".bar i").forEach(el => {
+    el.style.width = el.dataset.w + "%";
+    el.style.animationDelay = el.dataset.ritardo + "ms";
+  });
 }
 
 function renderPercorsi() {
@@ -120,7 +132,7 @@ function renderPageNav(current) {
   const p = flat[i - 1], n = flat[i + 1];
   box.innerHTML =
     (p ? `<a href="${p.f}"><span class="dir">← precedente</span>${p.t}</a>` : `<span></span>`) +
-    (n ? `<a href="${n.f}" style="text-align:right"><span class="dir">successivo →</span>${n.t}</a>` : `<span></span>`);
+    (n ? `<a href="${n.f}" class="pn-destra"><span class="dir">successivo →</span>${n.t}</a>` : `<span></span>`);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -13,6 +13,15 @@ metadata:
   labels: { app: learn-ai }
 spec:
   replicas: 2
+  # Durante un rollout convivono due versioni, e gli asset hanno nomi
+  # diversi fra l'una e l'altra: una pagina servita dal pod NUOVO che
+  # chiede il suo CSS a un pod VECCHIO prende 404. Con maxUnavailable 0
+  # i nuovi sono pronti prima che i vecchi escano, e la finestra si
+  # riduce al tempo di uscita dal Service. Non si azzera: e' scritto
+  # in LEGGIMI.md invece di essere dato per risolto.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: learn-ai }
   template:
@@ -23,7 +32,7 @@ spec:
         - name: dockerhub-vcnngr
       containers:
         - name: nginx
-          image: docker.io/vcnngr/learn-ai-sito:v20260812-0925
+          image: docker.io/vcnngr/learn-ai-sito:v20260812-0944
           ports:
             - containerPort: 8080
               name: http
