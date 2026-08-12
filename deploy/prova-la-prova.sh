@@ -93,6 +93,28 @@ if printf '%s' "$OUT3" | grep "il piede va in testa" | grep -q "MANCA"; then NOM
 ALTRI3=0
 if printf '%s' "$OUT3" | grep -E "colonna flex|scorre l.indice|non si comprime" | grep -q "MANCA"; then ALTRI3=1; fi
 
+# --- terza iniezione: la regola giusta sul SELETTORE SBAGLIATO ---
+#
+# E' il difetto che una review ha dovuto trovare al posto del gate: la
+# versione precedente cercava la stringa «da qualche parte nel media
+# query», quindi bastava che `order: -1` esistesse su un selettore
+# qualunque. Qui lo sposto su .sidebar-inner e il gate deve continuare
+# ad accusare .sidebar-piede.
+BK3=$(mktemp); cp "$CSSF" "$BK3"
+python3 - "$CSSF" <<'PYEOF'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1]); t = p.read_text()
+t = t.replace("    order: -1;\n", "", 1)
+t = t.replace("  .sidebar-inner { flex: none; min-height: auto; overflow: visible; padding-top: 22px; }",
+              "  .sidebar-inner { flex: none; min-height: auto; overflow: visible; padding-top: 22px; order: -1; }")
+p.write_text(t)
+PYEOF
+OUT5=$(python3 deploy/prova-layout.py 2>&1) && ESITO5=0 || ESITO5=$?
+cp "$BK3" "$CSSF"; rm -f "$BK3"
+SELETTORE=0
+if printf '%s' "$OUT5" | grep "il piede va in testa" | grep -q "MANCA su .sidebar-piede"; then SELETTORE=1; fi
+printf "  %-44s %s\n" "layout: regola sul selettore sbagliato" "$([ $ESITO5 = 1 ] && [ $SELETTORE = 1 ] && echo "vista" || echo NO)"
+
 OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
 TACE4=1
 case "$OUT4" in *MANCA*) TACE4=0 ;; esac
@@ -104,7 +126,8 @@ printf "  %-44s %s\n" "layout: a CSS integro tace" "$([ $TACE4 = 1 ] && [ $ESITO
 
 echo ""
 if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2" = "0" ] && [ "$TACE" = "1" ] \
-   && [ "$ESITO3" = "1" ] && [ "$NOMINA3" = "1" ] && [ "$ALTRI3" = "0" ] && [ "$ESITO4" = "0" ] && [ "$TACE4" = "1" ]; then
+   && [ "$ESITO3" = "1" ] && [ "$NOMINA3" = "1" ] && [ "$ALTRI3" = "0" ] && [ "$ESITO4" = "0" ] && [ "$TACE4" = "1" ] \
+   && [ "$ESITO5" = "1" ] && [ "$SELETTORE" = "1" ]; then
   echo "Il gate vede il difetto e tace quando non c'e'."
   exit 0
 fi
