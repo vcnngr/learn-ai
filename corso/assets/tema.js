@@ -82,7 +82,19 @@
     });
 
     box.append(etichetta, bottone);
-    // in fondo alla sidebar: e' un comando, non una voce di navigazione
-    dove.appendChild(box);
+
+    // IN ALTO, non in fondo.
+    //
+    // Prima lo appendevo alla fine di .sidebar-inner "perche' e' un
+    // comando, non una voce di navigazione". Ragionamento pulito e
+    // sbagliato: la sidebar ha height 100vh con overflow-y auto, e
+    // sopra ci stanno 24 moduli piu' 6 intestazioni di parte. Il
+    // comando finiva SOTTO LA PIEGA, raggiungibile solo scorrendo
+    // l'indice fino in fondo — cioe' invisibile a chi non lo cercava.
+    //
+    // Sta sotto l'intestazione, dove si vede senza scorrere niente.
+    const sub = dove.querySelector(".brand-sub");
+    if (sub && sub.nextSibling) dove.insertBefore(box, sub.nextSibling);
+    else dove.appendChild(box);
   });
 })();
