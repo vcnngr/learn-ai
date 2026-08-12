@@ -115,6 +115,29 @@ SELETTORE=0
 if printf '%s' "$OUT5" | grep "il piede va in testa" | grep -q "MANCA su .sidebar-piede"; then SELETTORE=1; fi
 printf "  %-44s %s\n" "layout: regola sul selettore sbagliato" "$([ $ESITO5 = 1 ] && [ $SELETTORE = 1 ] && echo "vista" || echo NO)"
 
+# --- quarta: falso verde da SOTTOSTRINGA ---
+# `flex-direction: column` e' contenuto in `column-reverse`, che
+# ribalta la colonna e porta il piede in cima sul desktop: un layout
+# diverso, che il confronto per sottostringa accettava.
+BK4=$(mktemp); cp "$CSSF" "$BK4"
+sed 's/flex-direction: column;/flex-direction: column-reverse;/' "$BK4" > "$CSSF"
+OUT6=$(python3 deploy/prova-layout.py 2>&1) && ESITO6=0 || ESITO6=$?
+cp "$BK4" "$CSSF"
+SOTTOSTRINGA=0
+if printf '%s' "$OUT6" | grep "colonna flex" | grep -q "column-reverse"; then SOTTOSTRINGA=1; fi
+printf "  %-44s %s\n" "layout: valore contenuto ma diverso" "$([ $ESITO6 = 1 ] && [ $SOTTOSTRINGA = 1 ] && echo "vista" || echo NO)"
+
+# --- quinta: falso verde da CASCATA ---
+# In CSS vince l'ultima dichiarazione. Una regola successiva che
+# sovrascrive `flex: none` passava, perche' il gate si fermava alla
+# prima regola col selettore giusto.
+printf '\n.sidebar-piede { flex: 1; }\n' >> "$CSSF"
+OUT7=$(python3 deploy/prova-layout.py 2>&1) && ESITO7=0 || ESITO7=$?
+cp "$BK4" "$CSSF"; rm -f "$BK4"
+CASCATA=0
+if printf '%s' "$OUT7" | grep "non si comprime" | grep -q "flex vale"; then CASCATA=1; fi
+printf "  %-44s %s\n" "layout: sovrascritto da una regola dopo" "$([ $ESITO7 = 1 ] && [ $CASCATA = 1 ] && echo "vista" || echo NO)"
+
 OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
 TACE4=1
 case "$OUT4" in *MANCA*) TACE4=0 ;; esac
@@ -127,7 +150,9 @@ printf "  %-44s %s\n" "layout: a CSS integro tace" "$([ $TACE4 = 1 ] && [ $ESITO
 echo ""
 if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2" = "0" ] && [ "$TACE" = "1" ] \
    && [ "$ESITO3" = "1" ] && [ "$NOMINA3" = "1" ] && [ "$ALTRI3" = "0" ] && [ "$ESITO4" = "0" ] && [ "$TACE4" = "1" ] \
-   && [ "$ESITO5" = "1" ] && [ "$SELETTORE" = "1" ]; then
+   && [ "$ESITO5" = "1" ] && [ "$SELETTORE" = "1" ] \
+   && [ "$ESITO6" = "1" ] && [ "$SOTTOSTRINGA" = "1" ] \
+   && [ "$ESITO7" = "1" ] && [ "$CASCATA" = "1" ]; then
   echo "Il gate vede il difetto e tace quando non c'e'."
   exit 0
 fi

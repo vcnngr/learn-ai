@@ -60,17 +60,36 @@ def corpo(testo, apertura):
 
 
 def dichiarazioni(testo, selettore):
-    """Le dichiarazioni della regola con QUEL selettore, in quel testo.
+    """Proprieta' -> valore per QUEL selettore, con la cascata rispettata.
 
-    Il confronto e' sul selettore esatto: `.sidebar` non deve combaciare
-    con `.sidebar-inner`, altrimenti il controllo verifica una regola
-    diversa da quella che crede.
+    Due dettagli che sembrano pedanteria e sono la differenza fra un
+    controllo e un falso verde:
+
+    ULTIMA, non prima. Il selettore puo' comparire piu' volte, e in CSS
+    vince l'ultima dichiarazione. Fermarsi alla prima regola fa passare
+    un `order: -1` che una regola successiva sovrascrive con `order: 0`.
+
+    VALORE INTERO, non sottostringa. `flex-direction: column` e'
+    contenuto in `column-reverse`, che ribalta la colonna e porterebbe
+    il piede in cima sul desktop — cioe' un layout diverso, accettato
+    come se fosse quello giusto.
     """
+    props = {}
     for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", testo):
         sels = [s.strip() for s in m.group(1).split(",")]
-        if selettore in sels:
-            return m.group(2)
-    return None
+        if selettore not in sels:
+            continue
+        for d in m.group(2).split(";"):
+            if ":" not in d:
+                continue
+            k, _, v = d.partition(":")
+            props[k.strip()] = " ".join(v.split())     # l'ultima vince
+    return props or None
+
+
+def attesa(regola):
+    k, _, v = regola.partition(":")
+    return k.strip(), " ".join(v.split())
 
 
 DESKTOP = re.sub(r"@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}", "", sorgente, flags=re.S)
@@ -100,11 +119,16 @@ for titolo, contesto, righe in CONTROLLI:
         continue
     for selettore, regola, nome in righe:
         d = dichiarazioni(contesto, selettore)
+        prop, valore = attesa(regola)
         if d is None:
             print(f"    {nome:<48} SELETTORE ASSENTE: {selettore}")
             falliti += 1
-        elif regola in d:
+        elif d.get(prop) == valore:
             print(f"    {nome:<48} ok")
+        elif prop in d:
+            print(f"    {nome:<48} MANCA su {selettore}: {prop} vale "
+                  f"{d[prop]!r}, atteso {valore!r}")
+            falliti += 1
         else:
             print(f"    {nome:<48} MANCA su {selettore}: {regola}")
             falliti += 1
