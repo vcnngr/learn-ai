@@ -81,6 +81,19 @@ selettore sbagliato, valore contenuto ma diverso, sovrascritto da una regola
 successiva, override per specificità, `!important` prima di una normale, e CSS
 integro che deve tacere.
 
+**Il gate confronta stringhe, il browser applica una sintassi.** Dove le due
+cose divergono il gate mente in silenzio. `deploy/prova-sintassi-css.py` inietta
+nove forme CSS valide e verifica che vengano lette come le legge un browser: le
+cinque scritture di `!important` (`! important`, `!IMPORTANT`, `!Important`…),
+i nomi di proprietà maiuscoli (`FLEX: 1` sovrascrive `flex: none`) e i valori
+maiuscoli (`COLUMN` è un `flex-direction` legittimo). Le prime sette devono
+essere **viste**, le ultime due **tollerate**: accusare CSS valido è un falso
+rosso, e un gate che grida al lupo si impara a ignorare.
+
+Tutte e tre le famiglie sono state trovate da una review, non da me, e tutte e
+tre confermate iniettandole prima di correggerle: il confronto letterale ne
+mancava quattro su cinque, poi due su due.
+
 **Cosa il gate non decide, e lo dice.** Non valuta la specificità: farlo davvero
 significa scrivere un motore di cascata, che sarebbe una nuova fonte di difetti
 invece di un controllo. Quando trova un'altra regola il cui *soggetto* è lo

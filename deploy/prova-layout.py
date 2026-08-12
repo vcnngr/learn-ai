@@ -104,7 +104,13 @@ def dichiarazioni(testo, selettore):
             if ":" not in d:
                 continue
             k, _, v = d.partition(":")
-            k = k.strip()
+            # I NOMI DELLE PROPRIETA' SONO CASE-INSENSITIVE in CSS:
+            # `FLEX: 1` e' identico a `flex: 1`. Tenendo il caso
+            # originale finivano in due chiavi distinte, e una
+            # `FLEX: 1` scritta dopo `flex: none` non sovrascriveva
+            # niente nel modello mentre nel browser vinceva: falso
+            # verde. Si normalizza qui, una volta.
+            k = k.strip().lower()
             v = " ".join(v.split())
             # `!important` non si cerca come stringa letterale: la
             # sintassi ammette spazio fra ! e important ed e'
@@ -125,7 +131,24 @@ def dichiarazioni(testo, selettore):
 
 def attesa(regola):
     k, _, v = regola.partition(":")
-    return k.strip(), " ".join(v.split())
+    return k.strip().lower(), " ".join(v.split())
+
+
+def uguali(atteso, trovato):
+    """Stesso valore, ignorando il caso.
+
+    Anche le parole chiave sono case-insensitive: `COLUMN` e' un
+    flex-direction valido quanto `column`, e il confronto esatto lo
+    dava per sbagliato — falso rosso, meno pericoloso del falso verde
+    ma sempre una risposta errata.
+
+    LIMITE DICHIARATO: non tutti i valori CSS sono case-insensitive
+    (nomi di font, url, identificatori personalizzati non lo sono).
+    Qui vale perche' ogni invariante di questo file ha per valore una
+    parola chiave o un numero. Se un invariante futuro guardera' un
+    nome di font, questo confronto andra' ristretto.
+    """
+    return atteso.lower() == trovato.lower()
 
 
 DESKTOP = re.sub(r"@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}", "", sorgente, flags=re.S)
@@ -164,7 +187,7 @@ for titolo, contesto, righe in CONTROLLI:
         if d is None:
             print(f"    {nome:<48} SELETTORE ASSENTE: {selettore}")
             falliti += 1
-        elif d.get(prop) == valore:
+        elif prop in d and uguali(valore, d[prop]):
             print(f"    {nome:<48} ok")
         elif prop in d:
             print(f"    {nome:<48} MANCA su {selettore}: {prop} vale "

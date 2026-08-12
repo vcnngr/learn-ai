@@ -164,12 +164,12 @@ IMPORTANTE=0
 if printf '%s' "$OUT9" | grep "non si comprime" | grep -q "flex vale '1'"; then IMPORTANTE=1; fi
 printf "  %-44s %s\n" "layout: !important prima di una normale" "$([ $ESITO9 = 1 ] && [ $IMPORTANTE = 1 ] && echo "vista" || echo NO)"
 
-# --- ottava: le forme valide di !important, in uno script a se' ---
-# Sta separato perche' inietta cinque varianti e le verifica una per
+# --- ottava: le forme CSS equivalenti, in uno script a se' ---
+# Sta separato perche' inietta nove varianti e le verifica una per
 # una: infilarlo qui dentro voleva dire annidare heredoc, che e' come
 # ci si sbaglia.
-python3 deploy/prova-important.py >/dev/null 2>&1 && VARIANTI=1 || VARIANTI=0
-printf "  %-44s %s\n" "layout: ogni forma valida di !important" "$([ $VARIANTI = 1 ] && echo si || echo NO)"
+python3 deploy/prova-sintassi-css.py >/dev/null 2>&1 && VARIANTI=1 || VARIANTI=0
+printf "  %-44s %s\n" "layout: legge il CSS come un browser" "$([ $VARIANTI = 1 ] && echo si || echo NO)"
 
 OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
 TACE4=1
