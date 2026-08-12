@@ -1,35 +1,36 @@
 // ============================================================
-//  tema.js — chiaro / scuro / automatico.
+//  tema.js — selettore del tema, tre posizioni.
 //
-//  Tre stati, non due. "Automatico" non e' un riempitivo: e' il
-//  default giusto, perche' segue la preferenza che il lettore ha
-//  gia' espresso al sistema operativo. Gli altri due esistono per
-//  quando quella preferenza e' sbagliata nel contesto — una stanza
-//  buia, un proiettore, una schermata condivisa.
+//  NON un bottone che cicla. Un ciclo nasconde le opzioni, non dice
+//  cosa viene dopo e cambia larghezza a ogni clic: va bene per un
+//  interruttore binario, non per tre posizioni.
 //
-//  La scelta si applica in <head>, PRIMA del primo paint, con lo
+//  Qui le tre posizioni si vedono tutte insieme e quella attiva e'
+//  marcata da un filetto SOPRA, in `signal`. Non e' un ornamento: e'
+//  l'idioma che le .note del corso gia' usano per dichiarare di che
+//  natura e' una cosa. Il comando dichiara il proprio stato con la
+//  stessa grammatica con cui le pagine dichiarano il proprio.
+//
+//  "sistema" e non "auto": dice CHI comanda, che e' la disciplina del
+//  resto del corso.
+//
+//  La scelta si applica in <head>, prima del primo paint, con lo
 //  snippet inline che ogni pagina porta. Se stesse qui, la pagina
-//  comparirebbe chiara e poi diventerebbe scura: un lampo bianco a
-//  ogni navigazione, su un sito che si legge di notte.
+//  comparirebbe chiara e poi diventerebbe scura.
 // ============================================================
 
 (function () {
   const STATI = [
-    { id: "auto",   etichetta: "auto",   titolo: "segue il sistema" },
-    { id: "chiaro", etichetta: "chiaro", titolo: "chiaro, anche se il sistema è scuro" },
-    { id: "scuro",  etichetta: "scuro",  titolo: "scuro, anche se il sistema è chiaro" },
+    { id: "auto",   voce: "sistema", desc: "segue la preferenza del sistema" },
+    { id: "chiaro", voce: "chiaro",  desc: "chiaro, anche se il sistema è scuro" },
+    { id: "scuro",  voce: "scuro",   desc: "scuro, anche se il sistema è chiaro" },
   ];
 
   // localStorage puo' LANCIARE, non solo restituire null: in un iframe
-  // sandboxed, in un'origine opaca, o con la memoria del sito bloccata,
-  // il solo accedervi solleva SecurityError. Senza questi try/catch
-  // l'eccezione interrompeva il gestore di DOMContentLoaded PRIMA che
-  // il comando venisse aggiunto: niente eccezione visibile all'utente,
-  // solo un bottone che non compare.
-  //
-  // La ricaduta e' su una preferenza, non su un contenuto: se non si
-  // puo' ricordare, si tiene in memoria per la sessione e il corso si
-  // legge lo stesso.
+  // sandboxed o con la memoria del sito bloccata, il solo accedervi
+  // solleva SecurityError e senza try/catch l'eccezione interrompe il
+  // gestore prima che il comando venga inserito — nessun errore
+  // visibile, solo un comando che non compare.
   let memoria = null;
 
   function leggi() {
@@ -49,52 +50,71 @@
     }
   }
 
-  function disegna(bottone, id) {
-    const s = STATI.find(x => x.id === id);
-    bottone.textContent = s.etichetta;
-    bottone.title = "Tema: " + s.titolo + ". Clic per cambiare.";
-    bottone.setAttribute("aria-label", "Tema: " + s.etichetta);
-  }
-
   document.addEventListener("DOMContentLoaded", () => {
     const dove = document.querySelector(".sidebar-inner");
     if (!dove) return;
 
-    const box = document.createElement("div");
-    box.className = "tema-box";
-
-    const etichetta = document.createElement("span");
-    etichetta.className = "tema-eti";
-    etichetta.textContent = "tema";
-
-    const bottone = document.createElement("button");
-    bottone.className = "tema-btn";
-    bottone.type = "button";
-
     let corrente = leggi();
-    disegna(bottone, corrente);
 
-    bottone.addEventListener("click", () => {
-      const i = STATI.findIndex(s => s.id === corrente);
-      corrente = STATI[(i + 1) % STATI.length].id;
-      applica(corrente);
-      disegna(bottone, corrente);
+    const gruppo = document.createElement("div");
+    gruppo.className = "tema";
+    gruppo.setAttribute("role", "radiogroup");
+    gruppo.setAttribute("aria-label", "Tema della pagina");
+
+    const eti = document.createElement("span");
+    eti.className = "tema-eti";
+    eti.textContent = "tema";
+    gruppo.appendChild(eti);
+
+    const posizioni = STATI.map(s => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tema-p";
+      b.textContent = s.voce;
+      b.title = s.desc;
+      b.dataset.val = s.id;
+      b.setAttribute("role", "radio");
+      gruppo.appendChild(b);
+      return b;
     });
 
-    box.append(etichetta, bottone);
+    function segna(id) {
+      corrente = id;
+      posizioni.forEach(b => {
+        const attivo = b.dataset.val === id;
+        b.setAttribute("aria-checked", attivo ? "true" : "false");
+        // tabindex mobile: il gruppo e' UNA fermata di tabulazione,
+        // e le frecce muovono fra le posizioni. E' il comportamento
+        // atteso da un radiogroup, non tre bottoni in fila.
+        b.tabIndex = attivo ? 0 : -1;
+      });
+    }
 
-    // IN ALTO, non in fondo.
-    //
-    // Prima lo appendevo alla fine di .sidebar-inner "perche' e' un
-    // comando, non una voce di navigazione". Ragionamento pulito e
-    // sbagliato: la sidebar ha height 100vh con overflow-y auto, e
-    // sopra ci stanno 24 moduli piu' 6 intestazioni di parte. Il
-    // comando finiva SOTTO LA PIEGA, raggiungibile solo scorrendo
-    // l'indice fino in fondo — cioe' invisibile a chi non lo cercava.
-    //
-    // Sta sotto l'intestazione, dove si vede senza scorrere niente.
+    function scegli(i, muoviFuoco) {
+      const s = STATI[(i + STATI.length) % STATI.length];
+      applica(s.id);
+      segna(s.id);
+      if (muoviFuoco) posizioni[STATI.indexOf(s)].focus();
+    }
+
+    posizioni.forEach((b, i) => {
+      b.addEventListener("click", () => scegli(i, false));
+      b.addEventListener("keydown", (e) => {
+        const k = e.key;
+        if (k === "ArrowRight" || k === "ArrowDown") { e.preventDefault(); scegli(i + 1, true); }
+        else if (k === "ArrowLeft" || k === "ArrowUp") { e.preventDefault(); scegli(i - 1, true); }
+        else if (k === "Home") { e.preventDefault(); scegli(0, true); }
+        else if (k === "End") { e.preventDefault(); scegli(STATI.length - 1, true); }
+      });
+    });
+
+    segna(corrente);
+
+    // In alto, sotto l'intestazione. In fondo alla sidebar finiva sotto
+    // la piega: 24 moduli e 6 intestazioni superano i 100vh, e il
+    // comando era raggiungibile solo scorrendo tutto l'indice.
     const sub = dove.querySelector(".brand-sub");
-    if (sub && sub.nextSibling) dove.insertBefore(box, sub.nextSibling);
-    else dove.appendChild(box);
+    if (sub && sub.nextSibling) dove.insertBefore(gruppo, sub.nextSibling);
+    else dove.insertBefore(gruppo, dove.firstChild);
   });
 })();

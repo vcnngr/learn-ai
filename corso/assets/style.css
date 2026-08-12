@@ -376,26 +376,39 @@ a.alloc-row:hover { background: var(--signal-wash); }
   .alloc-row { grid-template-columns: 40px 36px 1fr 52px; gap: 8px; }
 }
 
-/* ---------------- comando del tema ---------------- */
+/* ---------------- selettore del tema ----------------
+   Tre posizioni visibili, non un bottone che cicla.
 
-.tema-box {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin: 12px 0 0; padding-bottom: 12px;
+   La posizione attiva porta un FILETTO SOPRA in `signal`: e' lo stesso
+   idioma con cui .note > .mark dichiara di che natura e' un blocco.
+   Riusarlo qui non e' una citazione grafica — e' la stessa cosa detta
+   nello stesso modo: questo e' lo stato dichiarato. */
+
+.tema {
+  display: flex; align-items: baseline; gap: 11px;
+  margin: 13px 0 0; padding-bottom: 13px;
   border-bottom: 1px solid var(--rule);
 }
 .tema-eti {
-  font-family: var(--mono); font-size: 0.635rem; text-transform: uppercase;
+  font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
   letter-spacing: 0.12em; color: var(--ink-3);
 }
-.tema-btn {
-  font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em;
-  text-transform: uppercase; font-weight: 600;
-  color: var(--signal); background: var(--panel);
-  border: 1px solid var(--rule); border-radius: 3px;
-  padding: 3px 9px; cursor: pointer; min-width: 66px;
+.tema-p {
+  appearance: none; -webkit-appearance: none;
+  background: none; border: 0; border-top: 2px solid transparent;
+  padding: 5px 0 0; margin: 0; cursor: pointer;
+  font-family: var(--mono); font-size: 0.6rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--ink-3);
+  transition: color 0.12s ease, border-color 0.12s ease;
 }
-.tema-btn:hover { border-color: var(--signal); background: var(--signal-wash); }
-.tema-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.tema-p:hover { color: var(--ink); }
+.tema-p[aria-checked="true"] { color: var(--signal); border-top-color: var(--signal); }
+.tema-p:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-p { transition: none; }
+}
 
 /* ---------------- utilità di spaziatura ----------------
    Sostituiscono gli attributi style="..." inline.
