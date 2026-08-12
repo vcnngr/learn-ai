@@ -49,6 +49,10 @@ quattro volte di fila — tutte e quattro trovate da una review, nessuna da me.
 Ora le intestazioni stanno in un unico file incluso, e questo script controlla
 che l'inclusione abbia funzionato ovunque.
 
+**Gira anche in CI**, nel job `sito`, che costruisce l'immagine e lancia questo
+controllo a ogni push. Resta scritto qui perché va capito, e perché conviene
+lanciarlo in locale prima di pushare — ma non dipende più dal ricordarsene.
+
 ## 1. Il gate numerico
 
 ```bash

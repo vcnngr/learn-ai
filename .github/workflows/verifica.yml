@@ -71,6 +71,34 @@ jobs:
         run: docker run --rm -v "$PWD:/w" -w /w learn-ai python3 corso/verifica.py
 
   # ------------------------------------------------------------------
+  # IL SITO — l'immagine che gira davvero sul cluster.
+  #
+  # Fino a questo commit la CI non la costruiva nemmeno: un
+  # Dockerfile.sito rotto, o uno script di versionamento che smette di
+  # marcare gli asset, si sarebbero scoperti al rilascio.
+  #
+  # E il controllo delle intestazioni stava solo in RILASCIO.md, cioe'
+  # dipendeva dal ricordarsene — proprio la ragione per cui questa CI
+  # esiste. Quattro difetti consecutivi sulle intestazioni sono usciti
+  # da una review invece che da un controllo: adesso il controllo c'e',
+  # ed e' DURO.
+  # ------------------------------------------------------------------
+  sito:
+    name: immagine del sito e intestazioni
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Costruire l'immagine e' gia' meta' del controllo: lo script di
+      # versionamento fallisce il build se un riferimento resta senza
+      # digest nel nome.
+      - name: Costruisci l'immagine del sito
+        run: docker build -f Dockerfile.sito -t learn-ai-sito:ci .
+
+      - name: Ogni risposta porta le intestazioni che deve portare
+        run: sh deploy/prova-intestazioni.sh learn-ai-sito:ci
+
+  # ------------------------------------------------------------------
   # AMBIENTE RECENTE — quello che sulla macchina di scrittura NON si può
   # installare: su macOS x86 torch si ferma a 2.2.2.
   #
