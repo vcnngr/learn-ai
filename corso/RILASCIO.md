@@ -26,6 +26,11 @@ senza aver dimostrato niente. Quindi si verificano tre cose insieme: uscita 1, i
 rapporto *nomina* la mutazione, e a corso integro *non* la nomina. Va **prima** degli altri: un verde prodotto da un controllo che non
 può fallire è peggio di nessun controllo, perché autorizza a non guardare.
 
+Per il gate del **sito** la prova corrispondente è `deploy/prova-la-prova.sh`:
+inietta un difetto vero — toglie `Referrer-Policy` — e verifica che il rapporto
+lo nomini, non solo che diventi rosso. Vive lì e non in `prova_i_gate.py` perché
+ha bisogno di Docker, che nel container dei lab non c'è.
+
 `--riferimento` pretende verde anche il gate numerico. Usalo **solo qui**: quel gate
 dipende dalla CPU, e in CI la macchina non è quella che ha generato i numeri.
 

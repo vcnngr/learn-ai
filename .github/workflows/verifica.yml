@@ -95,6 +95,14 @@ jobs:
       - name: Costruisci l'immagine del sito
         run: docker build -f Dockerfile.sito -t learn-ai-sito:ci .
 
+      # Prima il gate, poi cio' che il gate controlla. Stessa regola del
+      # passo 0 di RILASCIO.md: un controllo che non si e' mai visto
+      # fallire non e' un controllo. Questo inietta un difetto reale —
+      # toglie Referrer-Policy — e verifica che il rapporto lo NOMINI,
+      # non solo che diventi rosso.
+      - name: La prova delle intestazioni sa fallire?
+        run: sh deploy/prova-la-prova.sh
+
       - name: Ogni risposta porta le intestazioni che deve portare
         run: sh deploy/prova-intestazioni.sh learn-ai-sito:ci
 
