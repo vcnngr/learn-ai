@@ -60,31 +60,62 @@ def corpo(testo, apertura):
 
 
 def dichiarazioni(testo, selettore):
-    """Proprieta' -> valore per QUEL selettore, con la cascata rispettata.
+    """Proprieta' -> valore per QUEL selettore, con la cascata rispettata
+    per quanto un controllo semplice possa farlo — e con un rifiuto
+    esplicito quando non puo'.
 
-    Due dettagli che sembrano pedanteria e sono la differenza fra un
-    controllo e un falso verde:
+    COSA GESTISCE
+      - ULTIMA, non prima: il selettore puo' comparire piu' volte e in
+        CSS vince l'ultima. Fermarsi alla prima fa passare un valore che
+        una regola successiva sovrascrive.
+      - !important: batte le dichiarazioni normali qualunque sia
+        l'ordine, quindi va tracciato o il modello dice il contrario del
+        browser.
 
-    ULTIMA, non prima. Il selettore puo' comparire piu' volte, e in CSS
-    vince l'ultima dichiarazione. Fermarsi alla prima regola fa passare
-    un `order: -1` che una regola successiva sovrascrive con `order: 0`.
-
-    VALORE INTERO, non sottostringa. `flex-direction: column` e'
-    contenuto in `column-reverse`, che ribalta la colonna e porterebbe
-    il piede in cima sul desktop — cioe' un layout diverso, accettato
-    come se fosse quello giusto.
+    COSA NON GESTISCE, E LO DICE
+      La SPECIFICITA'. `.sidebar .sidebar-piede` vince su
+      `.sidebar-piede` a parita' d'ordine, e valutarlo davvero vuol dire
+      scrivere un motore di cascata — che sarebbe una nuova fonte di
+      difetti, non un controllo.
+      Quindi: se esiste QUALUNQUE altra regola il cui selettore nomina
+      questo elemento senza essere il selettore esatto, il gate non
+      dichiara "ok": dichiara NON DETERMINABILE e fallisce. Un
+      "non lo so" rumoroso vale piu' di un verde che non significa
+      niente.
     """
-    props = {}
+    props, sospetti = {}, []
+    token = re.escape(selettore)
     for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", testo):
         sels = [s.strip() for s in m.group(1).split(",")]
-        if selettore not in sels:
+        esatto = selettore in sels
+        if not esatto:
+            # Conta solo se il token e' il SOGGETTO del selettore, cioe'
+            # l'ultimo compound: `.wrap .sidebar` colpisce lo stesso
+            # elemento con piu' specificita' ed e' un override vero,
+            # mentre `.sidebar h4` colpisce un DISCENDENTE e non
+            # sovrascrive niente di `.sidebar`. Senza questa distinzione
+            # il gate dichiarava non determinabile mezzo foglio di stile.
+            for s in sels:
+                soggetto = re.split(r"[\s>+~]+", s.strip())[-1]
+                if re.search(token + r"(?![\w-])", soggetto):
+                    sospetti.append(s.strip())
             continue
         for d in m.group(2).split(";"):
             if ":" not in d:
                 continue
             k, _, v = d.partition(":")
-            props[k.strip()] = " ".join(v.split())     # l'ultima vince
-    return props or None
+            k = k.strip()
+            v = " ".join(v.split())
+            imp = "!important" in v
+            v = v.replace("!important", "").strip()
+            # una dichiarazione !important non si lascia sovrascrivere
+            # da una normale, anche se questa viene dopo
+            if props.get(k, (None, False))[1] and not imp:
+                continue
+            props[k] = (v, imp)
+    if not props and not sospetti:
+        return None, []
+    return {k: v for k, (v, _) in props.items()}, sospetti
 
 
 def attesa(regola):
@@ -118,8 +149,13 @@ for titolo, contesto, righe in CONTROLLI:
         print()
         continue
     for selettore, regola, nome in righe:
-        d = dichiarazioni(contesto, selettore)
+        d, sospetti = dichiarazioni(contesto, selettore)
         prop, valore = attesa(regola)
+        if sospetti:
+            print(f"    {nome:<48} NON DETERMINABILE: altre regole "
+                  f"toccano {selettore} -> {sospetti[0]}")
+            falliti += 1
+            continue
         if d is None:
             print(f"    {nome:<48} SELETTORE ASSENTE: {selettore}")
             falliti += 1

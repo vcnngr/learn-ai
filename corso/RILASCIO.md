@@ -76,7 +76,17 @@ gate numerico, nessuna intestazione, nessun test headless può vedere che un
 elemento è finito sotto la piega. È già successo due volte.
 
 Gira in CI nel job `sito`, e la prova che sa fallire è in
-`deploy/prova-la-prova.sh`.
+`deploy/prova-la-prova.sh` — **sette scenari** sul solo layout: regola assente,
+selettore sbagliato, valore contenuto ma diverso, sovrascritto da una regola
+successiva, override per specificità, `!important` prima di una normale, e CSS
+integro che deve tacere.
+
+**Cosa il gate non decide, e lo dice.** Non valuta la specificità: farlo davvero
+significa scrivere un motore di cascata, che sarebbe una nuova fonte di difetti
+invece di un controllo. Quando trova un'altra regola il cui *soggetto* è lo
+stesso elemento — `.wrap .sidebar-piede` — non dichiara «ok»: dichiara
+**non determinabile** e fallisce. Un «non lo so» rumoroso vale più di un verde
+che non significa niente.
 
 ## 1. Il gate numerico
 

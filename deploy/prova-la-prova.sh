@@ -138,6 +138,32 @@ CASCATA=0
 if printf '%s' "$OUT7" | grep "non si comprime" | grep -q "flex vale"; then CASCATA=1; fi
 printf "  %-44s %s\n" "layout: sovrascritto da una regola dopo" "$([ $ESITO7 = 1 ] && [ $CASCATA = 1 ] && echo "vista" || echo NO)"
 
+# --- sesta: override per SPECIFICITA' ---
+# `.wrap .sidebar-piede` vince nel browser e il modello del gate non
+# valuta la specificita'. Deve dichiararlo NON DETERMINABILE, non "ok".
+BK5=$(mktemp); cp "$CSSF" "$BK5"
+printf '\n.wrap .sidebar-piede { flex: 1; }\n' >> "$CSSF"
+OUT8=$(python3 deploy/prova-layout.py 2>&1) && ESITO8=0 || ESITO8=$?
+cp "$BK5" "$CSSF"
+SPECIF=0
+if printf '%s' "$OUT8" | grep "non si comprime" | grep -q "NON DETERMINABILE"; then SPECIF=1; fi
+printf "  %-44s %s\n" "layout: override per specificita'" "$([ $ESITO8 = 1 ] && [ $SPECIF = 1 ] && echo "dichiarato" || echo NO)"
+
+# --- settima: !important PRIMA, valore normale DOPO ---
+# Il browser tiene il primo. Un modello "vince l'ultima" direbbe il
+# contrario del browser, cioe' sbaglierebbe in silenzio.
+python3 - "$CSSF" <<'PYEOF'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1]); t = p.read_text()
+p.write_text(t.replace(".sidebar-piede {\n  flex: none;",
+                       ".sidebar-piede {\n  flex: 1 !important;\n  flex: none;", 1))
+PYEOF
+OUT9=$(python3 deploy/prova-layout.py 2>&1) && ESITO9=0 || ESITO9=$?
+cp "$BK5" "$CSSF"; rm -f "$BK5"
+IMPORTANTE=0
+if printf '%s' "$OUT9" | grep "non si comprime" | grep -q "flex vale '1'"; then IMPORTANTE=1; fi
+printf "  %-44s %s\n" "layout: !important prima di una normale" "$([ $ESITO9 = 1 ] && [ $IMPORTANTE = 1 ] && echo "vista" || echo NO)"
+
 OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
 TACE4=1
 case "$OUT4" in *MANCA*) TACE4=0 ;; esac
@@ -152,7 +178,9 @@ if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2
    && [ "$ESITO3" = "1" ] && [ "$NOMINA3" = "1" ] && [ "$ALTRI3" = "0" ] && [ "$ESITO4" = "0" ] && [ "$TACE4" = "1" ] \
    && [ "$ESITO5" = "1" ] && [ "$SELETTORE" = "1" ] \
    && [ "$ESITO6" = "1" ] && [ "$SOTTOSTRINGA" = "1" ] \
-   && [ "$ESITO7" = "1" ] && [ "$CASCATA" = "1" ]; then
+   && [ "$ESITO7" = "1" ] && [ "$CASCATA" = "1" ] \
+   && [ "$ESITO8" = "1" ] && [ "$SPECIF" = "1" ] \
+   && [ "$ESITO9" = "1" ] && [ "$IMPORTANTE" = "1" ]; then
   echo "Il gate vede il difetto e tace quando non c'e'."
   exit 0
 fi
