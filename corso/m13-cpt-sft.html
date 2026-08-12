@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M13 — Continued pretraining vs SFT</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m13">
 <div class="wrap">
@@ -72,7 +72,7 @@ SFT (solo risposta)                  214              64     30%</code></pre>
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <table style="margin:0">
+    <table class="m-0">
       <tr><th></th><th>Continued pretraining</th><th>SFT</th></tr>
       <tr><td><strong>Obiettivo</strong></td><td>prevedere <em>ogni</em> token</td><td>prevedere solo la <em>risposta</em></td></tr>
       <tr><td><strong>Dati</strong></td><td>documenti grezzi</td><td>coppie istruzione/risposta con template</td></tr>
@@ -130,9 +130,9 @@ Entrambi          -> CPT, poi SFT CON replay dei dati grezzi,
     <p>Il modo tipico di sbagliare: si vuole insegnare <strong>conoscenza nuova</strong> e si costruisce un dataset di domande e risposte, perché è il formato che tutti usano.</p>
     <p>Ma in SFT la maggior parte dei token non contribuisce alla loss — qui il 70% è contesto. Per far assorbire un fatto stai usando una frazione dei token che avresti con lo stesso testo in forma grezza.</p>
     <p><strong>Sintomo osservabile:</strong> il modello impara benissimo il <em>formato</em> — risponde sempre nella forma giusta — ma il <em>contenuto</em> resta sbagliato o inventato. Nel lab è la riga «solo SFT»: 100% sul formato, e una perplessità di 87 540 sul testo di dominio.</p>
-    <div class="note errore" style="margin-top:14px;border:none;padding:0">
-      <div class="mark" style="border:none">Attenzione a<br>cosa il lab<br>NON dice</div>
-      <div class="body" style="border:none">
+    <div class="note errore mt-14-nb">
+      <div class="mark no-bordo">Attenzione a<br>cosa il lab<br>NON dice</div>
+      <div class="body no-bordo">
         <p><strong>«L'SFT non insegna conoscenza» sarebbe falso</strong>, e lo smentisce lo stesso lab: sugli otto fatti presenti nelle coppie Q/R, l'SFT arriva al <strong>100%</strong>. Il segnale supervisionato insegna fatti eccome.</p>
         <p>Quello che il lab mostra è più stretto: <em>a parità di corpus l'SFT supervisiona meno token</em> (qui il 30% contro il 100%), e i quattro fatti mai mostrati in forma Q/R restano allo 0%. È una questione di <strong>efficienza e di copertura del formato</strong>, non di impossibilità.</p>
         <p>Quindi la scelta fra i due regimi è <strong>empirica</strong>: si misura quale obiettivo e quale formato rendono di più sul proprio caso, con gli strumenti di M12. Non c'è una regola che decide al posto tuo.</p>

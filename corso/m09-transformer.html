@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M09 — Architettura del transformer</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m09">
 <div class="wrap">
@@ -66,7 +66,7 @@
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <pre style="margin:10px 0"><code>punteggi = Q @ K.T / √d        quanto ogni token guarda ogni altro
+    <pre class="m-10"><code>punteggi = Q @ K.T / √d        quanto ogni token guarda ogni altro
 pesi     = softmax(punteggi)   normalizzati a 1 per riga
 uscita   = pesi @ V            media pesata dei valori</code></pre>
     <p>Tre righe. Tutto il resto dell'architettura è impalcatura intorno a questo.</p>

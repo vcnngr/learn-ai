@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M16 — Preferenze: DPO e ORPO</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m16">
 <div class="wrap">
@@ -30,7 +30,7 @@
   <div class="mark">Prevedi</div>
   <div class="body">
     <p>DPO ottimizza questa quantità, dove <code>r</code> è la differenza di log-probabilità fra il modello e un riferimento congelato:</p>
-    <pre style="margin:10px 0"><code>L = −log σ( β · ( r(preferita) − r(rifiutata) ) )</code></pre>
+    <pre class="m-10"><code>L = −log σ( β · ( r(preferita) − r(rifiutata) ) )</code></pre>
     <ol>
       <li>Se l'addestramento funziona e il margine sale, la probabilità della risposta <strong>preferita</strong> deve salire?</li>
       <li>Guarda bene la formula prima di rispondere: cosa impone esattamente?</li>
@@ -49,7 +49,7 @@
     <p><strong>1. No.</strong> Nel lab la log-probabilità della preferita <strong>scende</strong>: da −0,028 a −0,210.</p>
     <p><strong>2.</strong> La formula impone solo che la <em>differenza</em> cresca. Abbassare molto la rifiutata (−56,335 → −118,501) e poco la preferita soddisfa l'obiettivo <strong>esattamente quanto</strong> alzare la preferita.</p>
     <p><strong>3. Due:</strong> quello che addestri e il riferimento congelato. Il conto di M06 va rifatto con entrambi.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Loss 0,004 · margine +62 · accuratezza 100%. <strong>Tutti e tre gli indicatori dicono «perfetto»</strong> mentre le risposte che volevi rendere più probabili diventano meno probabili.</p>
+    <p class="stacco">Loss 0,004 · margine +62 · accuratezza 100%. <strong>Tutti e tre gli indicatori dicono «perfetto»</strong> mentre le risposte che volevi rendere più probabili diventano meno probabili.</p>
   </div>
 </details>
 
@@ -101,7 +101,7 @@ logp della rifiutata            -56.335   -118.501      -62.165</code></pre>
   <div class="body">
     <p>La spiegazione facile — «nulla spinge la preferita verso l'alto» — <strong>è sbagliata</strong>, e vale la pena vedere perché, perché il meccanismo vero è più interessante.</p>
     <p>Deriviamo. Ponendo <code>z = β[(log π_w − log π_ref,w) − (log π_l − log π_ref,l)]</code>:</p>
-    <pre style="margin:10px 0"><code>∂L/∂(log π_preferita) = −β·σ(−z)  &lt; 0     spinge in ALTO
+    <pre class="m-10"><code>∂L/∂(log π_preferita) = −β·σ(−z)  &lt; 0     spinge in ALTO
 ∂L/∂(log π_rifiutata) = +β·σ(−z)  &gt; 0     spinge in BASSO</code></pre>
     <p>Il segnale locale sulla preferita è <strong>verso l'alto</strong>, non nullo. Eppure la sua log-probabilità scende. La contraddizione è solo apparente, e si scioglie notando che quelle due quantità <strong>non sono variabili indipendenti</strong>:</p>
     <ul>
@@ -157,7 +157,7 @@ margine                      0.0000         1.7445      +1.7445</code></pre>
   <div class="mark">Un passo dice<br>una cosa,<br>trecento<br>l'opposto</div>
   <div class="body">
     <p>Al <strong>primo</strong> passo la preferita <em>sale</em>: l'aggiornamento segue il segnale locale della parte A. Chi si fermasse qui concluderebbe che tutto torna.</p>
-    <pre style="margin:10px 0" data-lab="lab_16_1"><code>orizzonte                   variazione di logp(preferita)
+    <pre class="m-10" data-lab="lab_16_1"><code>orizzonte                   variazione di logp(preferita)
 1 passo (qui sopra)                               +0.0004
 300 passi (sezione 4)                             -0.1823</code></pre>
     <p>Il segnale locale è corretto <em>e all'inizio viene pure seguito</em>. Poi perde, per due motivi che si sommano:</p>
@@ -166,7 +166,7 @@ margine                      0.0000         1.7445      +1.7445</code></pre>
       <li>i parametri sono <strong>condivisi</strong>: i passi che continuano ad abbassare la rifiutata muovono pesi che servono anche alla preferita, e il softmax ridistribuisce la massa fra <em>tutte</em> le continuazioni.</li>
     </ol>
     <p>Quello che osservi non è il gradiente: è la sua <strong>proiezione</strong> nello spazio dei parametri, sommata su molti passi con un peso che svanisce.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Da portare via, ben oltre il DPO:</strong> «la loss spinge X verso l'alto» e «X sale dopo l'addestramento» sono due affermazioni diverse. La prima si legge nella formula; la seconda si misura — e su un passo può confermarla mentre su trecento la smentisce. Vale per qualunque loss su parametri condivisi.</p>
+    <p class="stacco"><strong>Da portare via, ben oltre il DPO:</strong> «la loss spinge X verso l'alto» e «X sale dopo l'addestramento» sono due affermazioni diverse. La prima si legge nella formula; la seconda si misura — e su un passo può confermarla mentre su trecento la smentisce. Vale per qualunque loss su parametri condivisi.</p>
   </div>
 </div>
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M02 — Derivate e gradienti</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m02">
 <div class="wrap">
@@ -47,7 +47,7 @@
     <p><strong>2.</strong> 9,006001 − 9 = <strong>0,006001</strong></p>
     <p><strong>3.</strong> 0,006001 / 0,001 = <strong>6,001</strong> ≈ <strong>6</strong></p>
     <p><strong>4.</strong> Più grande: verrebbe ≈ 20.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Hai appena calcolato una derivata.</strong> Nessuna formula, solo una divisione.</p>
+    <p class="stacco"><strong>Hai appena calcolato una derivata.</strong> Nessuna formula, solo una divisione.</p>
     <p>Il 6 significa: <em>in questo punto, y cambia sei volte più in fretta di x</em>. E il fatto che a x=10 venga 20 dice che <strong>la derivata dipende da dove ti trovi</strong> — non è una proprietà della funzione, è una proprietà del punto.</p>
     <p>La regola generale, se la vuoi: per <code>y = x²</code> la derivata è <code>2x</code>. A x=3 → 6. A x=10 → 20. Ma la regola serve meno di quanto pensi: quello che conta è il significato.</p>
   </div>
@@ -98,7 +98,7 @@
   <div class="mark">Nozione</div>
   <div class="body">
     <p>Se <code>u</code> dipende da <code>x</code>, e <code>y</code> dipende da <code>u</code>, allora:</p>
-    <pre style="margin:10px 0"><code>dy/dx  =  dy/du  ×  du/dx</code></pre>
+    <pre class="m-10"><code>dy/dx  =  dy/du  ×  du/dx</code></pre>
     <p>Le sensibilità si moltiplicano lungo la catena.</p>
   </div>
 </div>
@@ -166,7 +166,7 @@ gradiente = [0.5, -2.0, 0.0]</code></pre>
     <p><strong>1.</strong> <strong><code>X</code>, l'ingresso dello strato.</strong> Senza X non puoi calcolare <code>∂L/∂W</code>: la formula lo richiede esplicitamente.</p>
     <p><strong>2.</strong> <strong>Raddoppia.</strong> Cresce linearmente con batch × lunghezza della sequenza.</p>
     <p><strong>3.</strong> <strong>Sessanta</strong> — uno per strato, tutti insieme.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Hai appena scoperto da solo cosa sono le <strong>attivazioni</strong>, e perché occupano tanta memoria: sono gli ingressi di ogni strato, tenuti da parte perché il calcolo all'indietro li richiede.</p>
+    <p class="stacco">Hai appena scoperto da solo cosa sono le <strong>attivazioni</strong>, e perché occupano tanta memoria: sono gli ingressi di ogni strato, tenuti da parte perché il calcolo all'indietro li richiede.</p>
     <p>E hai scoperto perché esiste il <em>gradient checkpointing</em>: invece di conservarli tutti, ne conservi alcuni e <strong>ricalcoli</strong> gli altri quando servono. Meno memoria, più tempo di calcolo. È M07, ma il meccanismo lo hai già in mano.</p>
     <p><strong>Precisazione terminologica</strong>, perché la userò con precisione: si dice che X viene «trattenuto», non «copiato». Il sistema conserva un <em>riferimento</em> al blocco di memoria già esistente. Nessuna copia — semplicemente quella memoria non può essere liberata finché il calcolo all'indietro non è passato.</p>
   </div>
@@ -196,7 +196,7 @@ print(x.grad)                                # tensor(6.)  ← il 6 di prima</co
   <div class="mark">Precisione,<br>non pedanteria</div>
   <div class="body">
     <p><strong><code>.backward()</code> riempie <code>.grad</code> solo dei tensori <em>foglia</em></strong> (in inglese <em>leaf</em>): quelli che hai creato tu, non quelli prodotti da un'operazione.</p>
-    <pre style="margin:10px 0" data-lab="nessuno"><code>x = torch.tensor(3.0, requires_grad=True)   # foglia
+    <pre class="m-10" data-lab="nessuno"><code>x = torch.tensor(3.0, requires_grad=True)   # foglia
 u = x * 2                                    # NON foglia: risultato di un'operazione
 y = u ** 2
 y.backward()
@@ -243,10 +243,10 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
   <div class="mark">Nozione</div>
   <div class="body">
     <p><strong>Softmax</strong> trasforma numeri qualsiasi in probabilità: tutte positive, somma 1.</p>
-    <pre style="margin:10px 0"><code>p_i = e^(z_i) / Σ_j e^(z_j)</code></pre>
+    <pre class="m-10"><code>p_i = e^(z_i) / Σ_j e^(z_j)</code></pre>
     <p>L'esponenziale rende tutto positivo e amplifica le differenze; la divisione per la somma normalizza a 1.</p>
     <p><strong>Cross-entropy</strong> misura quanto era sbagliata la probabilità assegnata alla risposta giusta:</p>
-    <pre style="margin:10px 0"><code>L = −log(p_k)        k = indice del token corretto</code></pre>
+    <pre class="m-10"><code>L = −log(p_k)        k = indice del token corretto</code></pre>
     <p>Se il modello dava <code>p_k = 1</code> (certezza corretta), <code>−log(1) = 0</code>: nessun errore. Se dava <code>p_k = 0,01</code>, <code>−log(0,01) ≈ 4,6</code>. Se dava quasi zero, l'errore tende a infinito.</p>
   </div>
 </div>
@@ -274,7 +274,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
     <p><strong>3.</strong> <strong>Qualcosa è rotto, non è un successo</strong> — <em>a patto che il modello sia davvero appena inizializzato</em>. Una loss quasi nulla significa che sta già indovinando, quasi sempre perché vede la risposta in ingresso: maschera della loss sbagliata, o dati duplicati.</p>
     <p><strong>4.</strong> <strong>Molto peggio del caso, quindi anche questo è rotto.</strong> Il caso puro dà 11,76; per fare peggio bisogna essere sistematicamente sbagliati. Tipico di: token disallineati di una posizione, template errato, tokenizer diverso da quello del modello.</p>
 
-    <div class="note errore" style="margin-top:18px">
+    <div class="note errore mt-18">
       <div class="mark">Limite di<br>validità</div>
       <div class="body">
         <p><strong><code>log(V)</code> vale solo per un modello inizializzato a caso.</strong> Non è un controllo universale, ed è importante che tu non lo applichi dove non vale — cioè esattamente al tuo caso.</p>
@@ -285,7 +285,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
 
     <p><strong>I controlli giusti per un fine-tuning sono due, e sono di natura diversa.</strong> Tenerli separati è metà del lavoro: il primo è una verifica esatta, il secondo una misura rumorosa. Confonderli è il modo più comune di trarre conclusioni false.</p>
 
-    <div class="note nozione" style="margin-top:16px">
+    <div class="note nozione mt-16">
       <div class="mark">Controllo A<br>parità</div>
       <div class="body">
         <p><strong>Domanda:</strong> il mio codice di addestramento sta calcolando quello che credo?</p>
@@ -297,7 +297,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
 
     <p>Il controllo <strong>fallisce</strong> quando lo scarto supera la tolleranza numerica — <strong>in qualunque direzione</strong>. Più alta o più bassa è irrilevante: conta il valore assoluto. La conclusione è una sola e non ammette sfumature: <em>una delle condizioni che credevi identiche non lo è</em>. Il percorso di addestramento e quello di valutazione stanno facendo cose diverse.</p>
 
-    <div class="note errore" style="margin-top:16px">
+    <div class="note errore mt-16">
       <div class="mark">Come <em>non</em><br>si diagnostica</div>
       <div class="body">
         <p>Verrebbe naturale costruire una tabella «sintomo → causa» e leggere lo scarto per capire cosa è rotto. <strong>Non funziona, e ti farebbe concludere il falso.</strong></p>
@@ -311,7 +311,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
 
     <p>Le cause si separano con <strong>interventi</strong>, non con l'osservazione: ne elimini una alla volta e guardi se lo scarto sparisce. In ordine di costo — prima quello che costa un flag, poi quello che richiede di ispezionare i dati:</p>
 
-    <table style="margin-top:10px">
+    <table class="mt-10">
       <tr><th>Ipotesi</th><th>Intervento che la elimina</th></tr>
       <tr><td>Modalità o generatori casuali diversi</td><td>Forza <code>eval()</code> e lo stesso seme in entrambi i percorsi, poi rimisura.</td></tr>
       <tr><td>Adattatore non neutro all'inizializzazione</td><td>Azzera esplicitamente la matrice che deve essere nulla, e rimisura.</td></tr>
@@ -321,7 +321,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
       <tr><td>Maschera della loss diversa</td><td>Confronta il tensore delle etichette <strong>elemento per elemento</strong>: quali posizioni valgono <code>ignore_index</code> e quali no, e con che allineamento.</td></tr>
     </table>
 
-    <div class="note errore" style="margin-top:16px">
+    <div class="note errore mt-16">
       <div class="mark">Tre trappole<br>in questi test</div>
       <div class="body">
         <p><strong>Testo diverso non significa «è il template».</strong> Significa soltanto che la divergenza è <em>a monte della tokenizzazione</em> — e lì ci sta dentro tutto: come hai letto il record, quali campi hai mappato, se hai inserito un prompt di sistema, come hai normalizzato gli spazi. Per accusare il template devi prima dimostrare che l'input strutturato era identico. Altrimenti la conclusione onesta si ferma a «problema a monte del tokenizer», che è comunque un'informazione utile: hai dimezzato lo spazio di ricerca.</p>
@@ -339,9 +339,9 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
       </div>
     </div>
 
-    <p style="margin-top:12px">Questa è la struttura di ogni diagnosi seria, e la rivedrai in M21: <strong>non «che sintomo vedo», ma «quale esperimento minimo elimina un'ipotesi, e in quale ordine»</strong>. L'ordine non è estetica: un test che non isola inquina quelli dopo.</p>
+    <p class="mt-12">Questa è la struttura di ogni diagnosi seria, e la rivedrai in M21: <strong>non «che sintomo vedo», ma «quale esperimento minimo elimina un'ipotesi, e in quale ordine»</strong>. L'ordine non è estetica: un test che non isola inquina quelli dopo.</p>
 
-    <p style="margin-top:16px">Solo <strong>dopo</strong> che A passa, il secondo controllo ha senso.</p>
+    <p class="mt-16">Solo <strong>dopo</strong> che A passa, il secondo controllo ha senso.</p>
 
     <div class="note nozione">
       <div class="mark">Controllo B<br>apprendimento</div>
@@ -361,7 +361,7 @@ print(u.grad)      # None + warning ← non c'è, anche se il gradiente è stato
       </div>
     </div>
 
-    <p style="margin-top:16px">La versione <code>log(V)</code> resta valida e utile in M03 e M09, dove il modello lo costruisci tu da zero e parte davvero dal caso.</p>
+    <p class="mt-16">La versione <code>log(V)</code> resta valida e utile in M03 e M09, dove il modello lo costruisci tu da zero e parte davvero dal caso.</p>
     <p>Per riferimento, a inizializzazione casuale: vocabolario 32 000 → ≈ 10,4 · 128 000 → ≈ 11,8 · 256 000 → ≈ 12,5.</p>
   </div>
 </details>
@@ -402,7 +402,7 @@ y = 1 sulla risposta giusta, 0 altrove   es. [0,   0,   1  ]
     <p><strong>6.</strong> <strong>No, 1,8 è del tutto normale</strong>, e <code>log(V)</code> qui non si applica: il modello è già competente, non parte dal caso.</p>
     <p>Il controllo corretto è il <strong>controllo di parità</strong>: loss del modello base e loss al passo zero, tutto tenuto identico (stesso batch, stessa maschera, stessa modalità, stessi generatori casuali, adattatore appena inizializzato). Devono <em>coincidere</em>, perché un LoRA all'inizializzazione non contribuisce all'uscita. È un esito binario: passa o non passa.</p>
     <p>Se non coincidono, una delle condizioni che credevi identiche non lo è — e il valore 1,8 non c'entra. Se coincidono, il valore assoluto non ti dice nulla sulla qualità: quello lo misuri con un insieme tenuto da parte, in M12.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se hai risposto alla 6 applicando <code>log(V)</code>, è l'errore che questo modulo esiste per prevenire: <strong>un controllo valido in un regime, applicato al regime sbagliato, produce una diagnosi falsa</strong> — e ti manda a caccia di una contaminazione che non c'è.</p>
+    <p class="stacco">Se hai risposto alla 6 applicando <code>log(V)</code>, è l'errore che questo modulo esiste per prevenire: <strong>un controllo valido in un regime, applicato al regime sbagliato, produce una diagnosi falsa</strong> — e ti manda a caccia di una contaminazione che non c'è.</p>
   </div>
 </details>
 

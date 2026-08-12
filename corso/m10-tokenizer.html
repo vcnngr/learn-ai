@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M10 — Tokenizer e chat template</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m10">
 <div class="wrap">
@@ -30,7 +30,7 @@
   <div class="mark">Prevedi</div>
   <div class="body">
     <p>Hai addestrato un LoRA usando questo formato:</p>
-    <pre style="margin:10px 0"><code>### user:
+    <pre class="m-10"><code>### user:
 Ciao
 ### assistant:
 Salve.</code></pre>
@@ -68,7 +68,7 @@ Salve.</code></pre>
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <ol style="margin-bottom:8px">
+    <ol class="mb-8">
       <li>Parti dai singoli byte: 256 simboli, coprono qualunque testo.</li>
       <li>Conta le coppie adiacenti più frequenti nel corpus.</li>
       <li>Fondi la coppia più frequente in un simbolo nuovo.</li>
@@ -116,7 +116,7 @@ Simboli prodotti che NON stanno nel vocabolario: 0</code></pre>
     <p><code>gatto</code> costa 1 token, <code>gattopardo</code> ne costa 8 — pur condividendo i primi cinque caratteri. La fusione <code>gatto</w></code> richiede il marcatore di fine parola, che in <code>gattopardo</code> non c'è: non si applica, e la parola si sbriciola.</p>
     <p><strong>Le fusioni imparate valgono in un contesto preciso.</strong> Un carattere attaccato in più, uno spazio in meno, una virgola: la segmentazione può cambiare completamente anche se il testo a occhio è quasi identico.</p>
     <p>Nei tokenizer reali lo spazio iniziale fa parte del token — <code>"gatto"</code> e <code>" gatto"</code> sono due token diversi. Verificalo in dieci secondi sul tuo:</p>
-    <pre style="margin:10px 0"><code>print(tokenizer.encode("gatto"), tokenizer.encode(" gatto"))</code></pre>
+    <pre class="m-10"><code>print(tokenizer.encode("gatto"), tokenizer.encode(" gatto"))</code></pre>
     <p>Se gli id differiscono — e differiranno — allora uno spazio in più o in meno nel tuo template produce una sequenza diversa da quella vista in addestramento.</p>
   </div>
 </div>
@@ -200,7 +200,7 @@ tutto (sbagliato)          posizioni che contribuiscono:  53/53  (100%)</code></
   <div class="mark">Non tutti i<br>token speciali<br>vanno mascherati</div>
   <div class="body">
     <p>«Trovo token di struttura fra quelli attivi» non è di per sé un errore: <strong>dipende da quali</strong>.</p>
-    <table style="margin:10px 0">
+    <table class="m-10">
       <tr><th>Token</th><th>Va</th><th>Perché</th></tr>
       <tr><td><strong>Prefisso</strong> di struttura — l'intestazione che apre il turno assistant</td><td><strong>mascherato</strong></td><td>È parte del prompt: il modello lo riceve, non deve produrlo.</td></tr>
       <tr><td><strong>Terminatore</strong> di fine turno / EOS</td><td><strong>supervisionato</strong></td><td>È il token con cui il modello impara a <em>fermarsi</em>.</td></tr>

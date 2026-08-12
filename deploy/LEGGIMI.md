@@ -19,11 +19,28 @@ M15, applicata al deploy.
 Sul cluster **non c'è Python**. I lab non sono nemmeno copiati nell'immagine: si
 prendono da git, dove è giusto che stiano. Chiederli via web dà 404, di proposito.
 
+## Cache: perché gli URL sono versionati
+
+Davanti al cluster c'è **Cloudflare**, e riscrive le intestazioni di cache
+dell'origine: un `Cache-Control: no-cache` diventa `max-age=14400` al bordo. Con
+URL stabili una release può quindi accoppiare **HTML nuovo e CSS vecchio**.
+
+Non è un rischio teorico: è successo al primo rilascio del toggle. Le pagine sono
+uscite senza separatori perché il CSS in cache non aveva ancora le classi nuove,
+e `cf-cache-status` diceva `HIT`.
+
+`deploy/versiona-asset.sh` timbra la versione negli URL al momento del build —
+`assets/style.css?v=<tag>` — e un URL diverso è una risorsa diversa per qualunque
+cache, senza dover chiedere il permesso a nessuno. Il sorgente in git resta pulito:
+la marcatura esiste solo dentro l'immagine. Lo script **fallisce il build** se la
+marcatura non attecchisce, invece di produrre un'immagine con URL non versionati.
+
 ## Rilasciare una versione nuova
 
 ```bash
 TAG="v$(date +%Y%m%d-%H%M)"
-docker build --platform linux/amd64 -f Dockerfile.sito -t vcnngr/learn-ai-sito:$TAG .
+docker build --platform linux/amd64 -f Dockerfile.sito \
+       --build-arg VERSIONE=$TAG -t vcnngr/learn-ai-sito:$TAG .
 docker push vcnngr/learn-ai-sito:$TAG
 sed -i '' "s|learn-ai-sito:.*|learn-ai-sito:$TAG|" deploy/k8s.yaml
 kubectl apply -f deploy/k8s.yaml

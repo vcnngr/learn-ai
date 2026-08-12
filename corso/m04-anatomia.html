@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M04 — Anatomia dei pesi</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m04">
 <div class="wrap">
@@ -44,7 +44,7 @@
     <p><strong>1.</strong> <code>7·10⁹ × 2 byte = 14·10⁹ byte = <strong>14 GB</strong></code>.</p>
     <p><strong>2.</strong> <strong>Qualche kilobyte.</strong> Non serve caricare nulla: nomi, forme e tipi stanno tutti nell'intestazione, che è un JSON di pochi KB all'inizio del file. Leggi i primi 8 byte per sapere quanto è lunga, leggi quella, hai finito. Nel lab qui sotto, un checkpoint da 30 MB ha un'intestazione di 4 136 byte — su un modello da 14 GB resta dello stesso ordine.</p>
     <p><strong>3.</strong> <strong>Può contare qualcosa di diverso, e la differenza arriva a essere grossa.</strong> Se il modello ha gli <em>embedding legati</em>, la matrice del vocabolario è salvata una volta sola ma usata due volte — in ingresso e in uscita. Il numero dichiarato può includere entrambi gli usi, il disco no. Nel lab misuri uno scarto del <strong>27%</strong> su questa sola causa.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se ti è venuto naturale rispondere «serve tanta RAM quanto il file», hai appena disinnescato il riflesso più costoso: <strong>ispezionare non è caricare</strong>. Puoi rispondere a quasi tutte le domande su un modello da 500 GB dal tuo portatile.</p>
+    <p class="stacco">Se ti è venuto naturale rispondere «serve tanta RAM quanto il file», hai appena disinnescato il riflesso più costoso: <strong>ispezionare non è caricare</strong>. Puoi rispondere a quasi tutte le domande su un modello da 500 GB dal tuo portatile.</p>
   </div>
 </details>
 
@@ -54,11 +54,11 @@
   <div class="mark">Nozione</div>
   <div class="body">
     <p>Un file <code>.safetensors</code> è fatto così, e non c'è altro:</p>
-    <pre style="margin:10px 0"><code>[  8 byte ]  lunghezza N dell'intestazione, uint64 little-endian
+    <pre class="m-10"><code>[  8 byte ]  lunghezza N dell'intestazione, uint64 little-endian
 [  N byte ]  intestazione JSON
 [  resto  ]  i numeri dei tensori, uno dietro l'altro</code></pre>
     <p>L'intestazione mappa <strong>nome → <code>{dtype, shape, data_offsets}</code></strong>, dove <code>data_offsets</code> sono <code>[inizio, fine]</code> in byte dentro il blocco finale. Una voce reale:</p>
-    <pre style="margin:10px 0" data-lab="lab_04_1"><code>"model.embed_tokens.weight": {
+    <pre class="m-10" data-lab="lab_04_1"><code>"model.embed_tokens.weight": {
     "dtype": "BF16",
     "shape": [8000, 512],
     "data_offsets": [0, 8192000]
@@ -115,7 +115,7 @@ model.safetensors.index.json            mappa 39 tensori sugli shard</code></pre
   <div class="mark">Nozione</div>
   <div class="body">
     <p>Convenzione diffusa per un modello denso stile Llama. Ogni strato ripete lo stesso blocco:</p>
-    <pre style="margin:10px 0"><code>model.embed_tokens.weight                   tabella degli embedding
+    <pre class="m-10"><code>model.embed_tokens.weight                   tabella degli embedding
 
 model.layers.N.self_attn.q_proj.weight      query
 model.layers.N.self_attn.k_proj.weight      key
@@ -190,7 +190,7 @@ normalizzazioni           9          4,608    0.0%</code></pre>
     <p><strong>1.</strong> No, è voluto.</p>
     <p><strong>2.</strong> È <strong>Grouped-Query Attention</strong>: più teste di query condividono le stesse teste di key e value. Qui il rapporto è 4, cioè quattro teste di query per ogni gruppo di key/value. Il caso limite con un solo gruppo si chiama Multi-Query Attention; il caso senza condivisione, con Q e K della stessa forma, è l'attention classica a teste multiple.</p>
     <p><strong>3.</strong> Si risparmiano i parametri di K e V e il calcolo su di essi — e soprattutto la <em>KV cache</em> in inferenza, che è la ragione principale per cui la tecnica esiste. <strong>Non</strong> si risparmia nulla su Q, che resta a dimensione piena.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Verifica di coerenza che puoi fare su qualunque modello: <code>config.json</code> dichiara <code>num_attention_heads</code> e <code>num_key_value_heads</code>. Il loro rapporto deve coincidere con quello delle forme. Se non coincide, o hai letto male le forme o il checkpoint non è quello che credi.</p>
+    <p class="stacco">Verifica di coerenza che puoi fare su qualunque modello: <code>config.json</code> dichiara <code>num_attention_heads</code> e <code>num_key_value_heads</code>. Il loro rapporto deve coincidere con quello delle forme. Se non coincide, o hai letto male le forme o il checkpoint non è quello che credi.</p>
   </div>
 </details>
 

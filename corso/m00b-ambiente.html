@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M00b — Mettere in piedi l'ambiente</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m00b">
 <div class="wrap">
@@ -168,7 +168,7 @@
     <p><strong>2.</strong> <strong>Niente</strong>, se il lab prosegue: sta usando la strada di riserva e lo dichiara. Se invece <em>si ferma</em>, è un difetto del corso — quel ramo doveva avere un fallback — e va segnalato. In nessuno dei due casi la risposta è reinstallare l'ambiente.</p>
     <p><strong>3.</strong> <strong>No, ma non è più il tuo caso.</strong> Quella tabella resta corretta per un modello da 27B, che è ciò che dichiara. Per il tuo modello da 8B rifai il conto: <code>lab_06_1_memoria.py --params 8e9</code>. La pagina è un caso svolto, non un foglio di calcolo.</p>
     <p><strong>4.</strong> <strong>Molto poco, e sai esattamente quanto:</strong> i rami nativi di M09 (<code>F.rms_norm</code>, <code>enable_gqa</code>), che restano non verificabili. Il contenuto matematico è lo stesso — i lab lo calcolano a mano e lo confrontano con la formula di riferimento.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La risposta che accomuna le quattro: <strong>un ambiente diverso da quello del corso non è un problema da risolvere, è un dato da registrare.</strong> Quando un numero non tornerà — e succederà — la prima domanda sarà «quale versione ho?». In M15 questo diventa il manifest di un addestramento; qui è la sua versione minima.</p>
+    <p class="stacco">La risposta che accomuna le quattro: <strong>un ambiente diverso da quello del corso non è un problema da risolvere, è un dato da registrare.</strong> Quando un numero non tornerà — e succederà — la prima domanda sarà «quale versione ho?». In M15 questo diventa il manifest di un addestramento; qui è la sua versione minima.</p>
   </div>
 </details>
 

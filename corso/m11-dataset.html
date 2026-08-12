@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M11 — Dataset e loss masking</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m11">
 <div class="wrap">
@@ -116,7 +116,7 @@ Come si abilita il logging su syslog?         False     0.00  pulito</code></pre
   <div class="mark">Nozione</div>
   <div class="body">
     <p><strong>La contaminazione non è una proprietà che un file possiede: è una relazione fra due insiemi.</strong> Per rilevarla servono tre cose, e senza una qualsiasi delle tre la domanda non ha risposta:</p>
-    <ol style="margin-bottom:6px">
+    <ol class="mb-6">
       <li>Il corpus di addestramento, per intero.</li>
       <li>Una definizione operativa di «match» — esatto, normalizzato, semantico.</li>
       <li>Una soglia.</li>

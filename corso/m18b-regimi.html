@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M18b — Il tuo hardware: quattro regimi</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m18b">
 <div class="wrap">
@@ -221,7 +221,7 @@ python3 corso/labs/lab_18b_1_regimi.py --params 8e9 --mostra-tetti</code></pre>
     <p><strong>3. Meno affidabile.</strong> Assume divisione perfetta e ignora i buffer, ma su più nodi l'all-gather passa dalla rete: l'ottimismo che su un nodo è un'approssimazione, fra nodi diventa un errore di ordine di grandezza.</p>
     <p><strong>4. Il manifest di M15</strong> — versioni, driver, sha del dataset, semi — <em>prima</em> di lanciare. Su un'istanza effimera non esiste un «dopo» in cui chiederglielo.</p>
     <p><strong>5.</strong> Che sei limitato dalla <strong>banda</strong>, non dal calcolo. È il segnale atteso in quel regime, e la conseguenza pratica è che le ottimizzazioni sulla memoria non ti daranno velocità: quella la daranno meno byte mossi per passo.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La risposta che le lega tutte: <strong>l'aritmetica è invariante, la domanda no.</strong> Il corso ti ha dato la prima; questo modulo esiste perché la seconda non venga data per scontata.</p>
+    <p class="stacco">La risposta che le lega tutte: <strong>l'aritmetica è invariante, la domanda no.</strong> Il corso ti ha dato la prima; questo modulo esiste perché la seconda non venga data per scontata.</p>
   </div>
 </details>
 

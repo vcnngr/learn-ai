@@ -20,18 +20,32 @@
     { id: "scuro",  etichetta: "scuro",  titolo: "scuro, anche se il sistema è chiaro" },
   ];
 
+  // localStorage puo' LANCIARE, non solo restituire null: in un iframe
+  // sandboxed, in un'origine opaca, o con la memoria del sito bloccata,
+  // il solo accedervi solleva SecurityError. Senza questi try/catch
+  // l'eccezione interrompeva il gestore di DOMContentLoaded PRIMA che
+  // il comando venisse aggiunto: niente eccezione visibile all'utente,
+  // solo un bottone che non compare.
+  //
+  // La ricaduta e' su una preferenza, non su un contenuto: se non si
+  // puo' ricordare, si tiene in memoria per la sessione e il corso si
+  // legge lo stesso.
+  let memoria = null;
+
   function leggi() {
-    const t = localStorage.getItem("tema");
+    let t = memoria;
+    try { t = localStorage.getItem("tema"); } catch (e) { /* memoria */ }
     return STATI.some(s => s.id === t) ? t : "auto";
   }
 
   function applica(id) {
+    memoria = id === "auto" ? null : id;
     if (id === "auto") {
       delete document.documentElement.dataset.tema;
-      localStorage.removeItem("tema");
+      try { localStorage.removeItem("tema"); } catch (e) { /* memoria */ }
     } else {
       document.documentElement.dataset.tema = id;
-      localStorage.setItem("tema", id);
+      try { localStorage.setItem("tema", id); } catch (e) { /* memoria */ }
     }
   }
 

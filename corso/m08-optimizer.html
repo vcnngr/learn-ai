@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M08 — Optimizer, learning rate, batch</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m08">
 <div class="wrap">
@@ -48,14 +48,14 @@
    0.5       DIVERGE           DIVERGE             DIVERGE</code></pre>
     <p><strong>1.</strong> <strong>Identico</strong> a ogni learning rate, su tutte le cifre stampate. Le prime due colonne coincidono: l'accumulazione fatta bene <em>è</em> un batch grande. È il modo standard di ottenere batch che in memoria non ci starebbero.</p>
     <p><strong>2.</strong> Sommi i gradienti invece di mediarli: qui equivale a <strong>moltiplicare il learning rate per il numero di accumulazioni</strong>. Nella terza colonna, un lr effettivo 4 volte più alto.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Sotto quali condizioni.</strong> Nessuna delle due risposte è universale, e le condizioni sono quelle del lab: <strong>SGD</strong>, loss <strong>additiva sugli esempi</strong>, micro-batch <strong>tutti della stessa dimensione</strong>, nessuna operazione che dipenda dal batch.</p>
+    <p class="stacco"><strong>Sotto quali condizioni.</strong> Nessuna delle due risposte è universale, e le condizioni sono quelle del lab: <strong>SGD</strong>, loss <strong>additiva sugli esempi</strong>, micro-batch <strong>tutti della stessa dimensione</strong>, nessuna operazione che dipenda dal batch.</p>
     <ul>
       <li><strong>L'equivalenza (1) si rompe</strong> con normalizzazioni o stati che dipendono dal batch, con denominatori diversi fra micro-batch — è il caso tipico delle sequenze con maschera, dove il numero di token supervisionati varia — e con dropout o qualunque consumo di RNG che cambi ordine. In precisione finita resta comunque un'equivalenza a meno dell'arrotondamento, non bit per bit.</li>
       <li><strong>Con sequenze mascherate</strong> la divisione giusta non è «per il numero di accumulazioni» ma <strong>per il numero complessivo di token supervisionati</strong> del batch effettivo. Dividere per <code>accum</code> pesa di più i micro-batch con pochi token validi.</li>
       <li><strong>La riscrittura (2) come «learning rate ×4» vale per l'update lineare di SGD.</strong> Con AdamW no: il passo divide per la radice di <code>exp_avg_sq</code>, quindi un gradiente riscalato viene in buona parte <em>normalizzato via</em>, e ciò che resta interagisce con <code>epsilon</code>, con il clipping e con il weight decay disaccoppiato. Descrivilo per quello che è — <strong>un riscalamento del gradiente</strong> — e non aspettarti che equivalga a toccare il learning rate.</li>
     </ul>
     <p><strong>3.</strong> <strong>Niente.</strong> Nessun errore, nessun avviso.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Guarda la prima riga: senza la divisione la loss viene <em>migliore</em> (0,033 contro 0,091). A learning rate basso l'errore <strong>sembra un miglioramento</strong>. Poi a <code>lr=0,2</code> la configurazione corretta converge e quella sbagliata <strong>diverge</strong>.</p>
+    <p class="stacco">Guarda la prima riga: senza la divisione la loss viene <em>migliore</em> (0,033 contro 0,091). A learning rate basso l'errore <strong>sembra un miglioramento</strong>. Poi a <code>lr=0,2</code> la configurazione corretta converge e quella sbagliata <strong>diverge</strong>.</p>
     <p>Questa è la forma tipica dei bug che ti costano una settimana: non falliscono subito, falliscono quando cambi qualcos'altro.</p>
   </div>
 </details>
@@ -133,7 +133,7 @@ Adam                      0.05     0.021464     0.021464    0.030354</code></pre
    0.5           191583104.00                  3003.65</code></pre>
     <p>Tutti partono da una loss di circa <strong>1,0</strong>. Senza warmup, a <code>lr=0,1</code> la loss schizza a <strong>6 620</strong> prima di riprendersi. Con warmup resta a <strong>1,37</strong>.</p>
     <p><strong>Il meccanismo:</strong> all'inizio gli stati di Adam sono vuoti. Le sue stime della scala del gradiente sono costruite su uno o due campioni, quindi inaffidabili — e il passo che ne esce può essere enorme. Il warmup gli dà il tempo di riempirsi prima di fidarsene.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Perché su un modello grande è peggio.</strong> Qui il picco si riassorbe: dopo 60 passi la loss finale è simile nei due casi. Su un modello grande quei primi passi possono spostare i pesi così lontano da non tornare più — e il log non mostra nessun errore, solo un addestramento che poi rende meno del previsto.</p>
+    <p class="stacco"><strong>Perché su un modello grande è peggio.</strong> Qui il picco si riassorbe: dopo 60 passi la loss finale è simile nei due casi. Su un modello grande quei primi passi possono spostare i pesi così lontano da non tornare più — e il log non mostra nessun errore, solo un addestramento che poi rende meno del previsto.</p>
   </div>
 </details>
 
@@ -159,7 +159,7 @@ soglia   1.0  norma prima 5.00  dopo 1.0000   direzione invariata: True</code></
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <pre style="margin:10px 0"><code>batch effettivo = micro_batch × accumulazioni × numero di GPU</code></pre>
+    <pre class="m-10"><code>batch effettivo = micro_batch × accumulazioni × numero di GPU</code></pre>
     <p>È questo il numero che determina il comportamento dell'addestramento. Gli altri tre sono solo modi di ripartirlo fra memoria e tempo.</p>
     <p><strong>Conseguenza che sorprende:</strong> passare da 1 a 2 GPU con DDP <em>raddoppia il batch effettivo</em> anche se non hai toccato nessun parametro di configurazione. L'addestramento che gira su due GPU non è lo stesso che girava su una — e se confronti i risultati senza saperlo, stai confrontando due cose diverse.</p>
   </div>

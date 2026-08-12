@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M14 — LoRA, QLoRA, DoRA</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m14">
 <div class="wrap">
@@ -66,7 +66,7 @@ tutti e sette                             7   66,322,432     0.246%</code></pre>
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <pre style="margin:10px 0"><code>W_eff = W + (alpha / r) · B · A
+    <pre class="m-10"><code>W_eff = W + (alpha / r) · B · A
 
 r      quanto è ESPRESSIVO l'aggiornamento (il rango della matrice)
 alpha  quanto è FORTE       (un fattore di scala)</code></pre>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M12 — Valutazione</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m12">
 <div class="wrap">
@@ -57,7 +57,7 @@ In 4/10 run la conclusione ingenua è sbagliata o nulla</code></pre>
   1000                   50%                    0%
   2000                   74%                    0%</code></pre>
     <p><strong>2. Il 74%.</strong> Anche con duemila esempi, <strong>un quarto delle volte concludi «non dimostrato»</strong> pur essendoci una differenza reale di 3,3 punti.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Guarda però la colonna di destra: <strong>zero casi su 200</strong> a ogni dimensione. <strong>Attenzione a come si legge:</strong> non è una garanzia. Un intervallo al 95% <em>può</em> escludere lo zero dal lato sbagliato — è raro, non impossibile. Con 0 casi su 200, il limite superiore al 95% su quel tasso resta intorno all'1,5%.</p>
+    <p class="stacco">Guarda però la colonna di destra: <strong>zero casi su 200</strong> a ogni dimensione. <strong>Attenzione a come si legge:</strong> non è una garanzia. Un intervallo al 95% <em>può</em> escludere lo zero dal lato sbagliato — è raro, non impossibile. Con 0 casi su 200, il limite superiore al 95% su quel tasso resta intorno all'1,5%.</p>
     <p>E anche l'1,5% va letto per quello che è: è il limite superiore sul tasso <em>di questa simulazione ripetuta</em>, sotto l'assunzione di 200 prove indipendenti nello stesso regime. Non è una proprietà dell'intervallo in generale.</p>
     <p>La proprietà vera è più modesta e comunque preziosa: <strong>quello del lab è un intervallo bootstrap percentile al 95% <em>nominale</em></strong> — la copertura effettiva dipende dalla distribuzione e dalla dimensione campionaria, e il 95% è l'obiettivo dichiarato, non una garanzia. Ma anche così il tasso di conclusioni invertite misurato è piccolo, mentre nel confronto ingenuo era 3 su 10. Non «zero contro qualcosa»: raro e misurato contro frequente e non controllato.</p>
   </div>

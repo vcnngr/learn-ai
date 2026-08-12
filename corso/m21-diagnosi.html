@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M21 — Diagnosi di un fine-tuning deludente</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m21">
 <div class="wrap">
@@ -52,7 +52,7 @@
 8. rango insufficiente                       giorni, più addestramenti
 9. dati insufficienti                        settimane</code></pre>
     <p>Nota dove finiscono «dati» e «rango»: <strong>in fondo</strong>. Sono le ipotesi più interessanti e le più costose, ed è esattamente il motivo per cui non si parte da lì.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Da dove viene questa lista, e da dove non viene.</strong> Minuti, ore, giorni e settimane non escono da nessun lab: sono la stima dell'autore per <em>questo</em> caso di studio, e con essa cade anche l'ordine. Il costo di un'ipotesi dipende da cosa hai già in casa — artefatti, automazione, dimensione dei run, stack, organizzazione — e cambia l'ordine in modo non piccolo.</p>
+    <p class="stacco"><strong>Da dove viene questa lista, e da dove non viene.</strong> Minuti, ore, giorni e settimane non escono da nessun lab: sono la stima dell'autore per <em>questo</em> caso di studio, e con essa cade anche l'ordine. Il costo di un'ipotesi dipende da cosa hai già in casa — artefatti, automazione, dimensione dei run, stack, organizzazione — e cambia l'ordine in modo non piccolo.</p>
     <p>Due esempi concreti di ribaltamento: se hai una valutazione già pronta e strumentata, il punto 5 costa un pomeriggio invece che giorni e sale in cima; se invece devi ricostruire una parity senza manifest (M15, M20), il punto 1 può costare più di uno sweep sul rango, e scende.</p>
     <p><strong>Quello che va trasferito è il metodo, non l'ordine.</strong> Per ogni ipotesi stima due cose nel tuo contesto — <em>quanto costa escluderla</em> e <em>quanto discrimina</em>, cioè quante altre ipotesi cade con lei — e ordina con quei due valori. Dove non hai dati di costo, scrivi «non verificabile» e misuralo la prima volta che ci passi: la seconda diagnosi parte già ordinata sui tuoi numeri.</p>
     <p><strong>3.</strong> Il <strong>criterio di decisione</strong>: quale risultato esclude l'ipotesi e quale la conferma. Se lo scrivi dopo aver visto il risultato, non stai falsificando un'ipotesi — la stai interpretando.</p>

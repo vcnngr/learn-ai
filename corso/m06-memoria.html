@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M06 — Aritmetica della memoria</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m06">
 <div class="wrap">
@@ -51,8 +51,8 @@ copia master fp32          108.0   2.7e10 x 4 byte (se l'impl. la tiene)
 ---------------------- ---------
 STATICO totale             432.0   senza attivazioni</code></pre>
     <p><strong>432 GB.</strong> Otto volte i pesi. Su una GPU da 141: non entra. Su due, nemmeno partizionando idealmente — <code>432 / 2 = 216</code> GB per GPU, ancora sopra il tetto.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">La voce che sorprende quasi tutti è la terza. <strong>Gli stati dell'optimizer sono la voce più grande di tutte</strong>, quattro volte i pesi: AdamW tiene due momenti per parametro addestrabile, qui contati in <code>fp32</code> — 4+4 = 8 byte.</p>
-    <div class="note errore" style="margin-top:14px">
+    <p class="stacco">La voce che sorprende quasi tutti è la terza. <strong>Gli stati dell'optimizer sono la voce più grande di tutte</strong>, quattro volte i pesi: AdamW tiene due momenti per parametro addestrabile, qui contati in <code>fp32</code> — 4+4 = 8 byte.</p>
+    <div class="note errore mt-14">
       <div class="mark">Questa è UNA<br>configurazione,<br>non «AdamW»</div>
       <div class="body">
         <p>Gli 8 byte e la copia master descrivono una <strong>configurazione di mixed precision dichiarata</strong>, non una proprietà dell'algoritmo. In M08 il lab lo misura: chiedendo a PyTorch di usare AdamW su pesi <code>bf16</code>, gli stati nascono <code>bf16</code> — <strong>4 byte per parametro</strong>, e nessuna copia master automatica.</p>
@@ -69,7 +69,7 @@ STATICO totale             432.0   senza attivazioni</code></pre>
 <div class="note nozione">
   <div class="mark">Nozione</div>
   <div class="body">
-    <table style="margin:0">
+    <table class="m-0">
     <tr><th>Voce</th><th>Segue</th><th>Byte per parametro</th></tr>
     <tr><td><strong>1. Pesi</strong></td><td>tutti i parametri</td><td>2 (bf16), 4 (fp32), ~0,5 (4 bit)</td></tr>
     <tr><td><strong>2. Gradienti</strong></td><td><em>solo</em> gli addestrabili</td><td>2, stessa forma dei pesi</td></tr>
@@ -77,7 +77,7 @@ STATICO totale             432.0   senza attivazioni</code></pre>
     <tr><td><strong>4. Copia master</strong></td><td><em>solo</em> gli addestrabili</td><td>4, <em>se</em> l'implementazione la tiene</td></tr>
     <tr><td><strong>5. Attivazioni</strong></td><td>batch × sequenza</td><td>non per parametro — vedi sotto</td></tr>
     </table>
-    <p style="margin-top:14px">Le prime quattro sono <strong>statiche</strong>: ci sono sempre, non dipendono dal batch. La quinta è l'unica che controlli senza cambiare metodo.</p>
+    <p class="mt-14">Le prime quattro sono <strong>statiche</strong>: ci sono sempre, non dipendono dal batch. La quinta è l'unica che controlli senza cambiare metodo.</p>
   </div>
 </div>
 
@@ -187,7 +187,7 @@ Esempio, hidden=5120, layers=46, bf16, k=10:
   <li><strong>Dimenticare che la formula sottostima.</strong> Mancano sempre: workspace temporanei dei kernel, frammentazione dell'allocatore, buffer di comunicazione, e i <strong>logit</strong> — <code>batch × seq × vocabolario</code>, che con un vocabolario da 128 000 voci non è affatto trascurabile.</li>
 </ol>
 
-<p style="font-size:1.05rem"><strong>Regola pratica: se il conto dice che ci stai per un pelo, non ci stai.</strong></p>
+<p class="grande"><strong>Regola pratica: se il conto dice che ci stai per un pelo, non ci stai.</strong></p>
 
 <h2>Il tetto non è duro</h2>
 

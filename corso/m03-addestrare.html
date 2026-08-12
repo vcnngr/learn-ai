@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M03 — Cosa vuol dire addestrare</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m03">
 <div class="wrap">
@@ -44,8 +44,8 @@
     <p><strong>1.</strong> <strong>Diminuire.</strong> Gradiente positivo significa «aumentando <code>w</code>, la loss sale». Vuoi il contrario.</p>
     <p><strong>2.</strong> <code>w = 2,0 − 0,1 × 3,0 = <strong>1,7</strong></code></p>
     <p><strong>3.</strong> <code>w = 2,0 − 10 × 3,0 = <strong>−28,0</strong></code>. Sei saltato dall'altra parte, molto più lontano di dove eri. Al passo dopo il gradiente punterà indietro, ancora più forte, e ricomincerai a saltare avanti e indietro allontanandoti ogni volta.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Hai appena scritto la discesa del gradiente</strong>, l'unica regola di aggiornamento che ti serve capire:</p>
-    <pre style="margin:10px 0"><code>w  ←  w  −  lr × (∂L/∂w)</code></pre>
+    <p class="stacco"><strong>Hai appena scritto la discesa del gradiente</strong>, l'unica regola di aggiornamento che ti serve capire:</p>
+    <pre class="m-10"><code>w  ←  w  −  lr × (∂L/∂w)</code></pre>
     <p>Il segno meno è tutto: il gradiente punta verso la salita, tu vai nel verso opposto. Il <code>lr</code> decide quanto ti fidi di quella direzione — e nel punto 3 hai già intuito che fidarsi troppo non è conservativo, è distruttivo.</p>
   </div>
 </details>
@@ -56,7 +56,7 @@
   <div class="mark">Nozione</div>
   <div class="body">
     <p>Ogni addestramento, dal più piccolo al più grande, è questo:</p>
-    <pre style="margin:10px 0"><code>for batch in dati:
+    <pre class="m-10"><code>for batch in dati:
     pred = modello(batch.x)            # 1  avanti
     loss = criterio(pred, batch.y)     # 2  quanto sbaglia (uno scalare)
     loss.backward()                    # 3  indietro: riempie i .grad
@@ -185,7 +185,7 @@ Trovati:  w = 2.9923   b = 1.9956        Veri: 3.0 e 2.0</code></pre>
   <div class="risposta-inner">
     <p><strong>È corretto, ed è un dato importante.</strong> Ai dati è stato aggiunto rumore casuale con deviazione standard <code>0,1</code>. Nessun modello della forma <code>w·x + b</code> può spiegare quel rumore: è imprevedibile per costruzione.</p>
     <p>L'errore residuo è circa <code>0,1² = 0,01</code> — e infatti la loss si ferma a <code>0,01124</code>. Il modello ha estratto <em>tutto</em> il segnale disponibile e si è fermato lì.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Rovescia il ragionamento e ottieni una regola diagnostica: <strong>una loss che scende a zero su dati rumorosi non è un successo, è un allarme.</strong> Significa che il modello sta spiegando anche il rumore — cioè sta memorizzando. È esattamente quello che vedi nella prossima sezione.</p>
+    <p class="stacco">Rovescia il ragionamento e ottieni una regola diagnostica: <strong>una loss che scende a zero su dati rumorosi non è un successo, è un allarme.</strong> Significa che il modello sta spiegando anche il rumore — cioè sta memorizzando. È esattamente quello che vedi nella prossima sezione.</p>
   </div>
 </details>
 

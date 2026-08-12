@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M07 — Forward, backward, autograd</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m07">
 <div class="wrap">
@@ -30,7 +30,7 @@
   <div class="mark">Prevedi</div>
   <div class="body">
     <p>Quattro operazioni. Per ciascuna: <strong>quali tensori devono restare in memoria</strong> fino al calcolo all'indietro?</p>
-    <pre style="margin:10px 0"><code>y = x @ W
+    <pre class="m-10"><code>y = x @ W
 y = relu(x)
 y = x * 2
 y = x.exp()</code></pre>
@@ -47,14 +47,14 @@ y = x @ W      MmBackward0        mat2[8, 16], self[4, 8]
 y = relu(x)    ReluBackward0      result[4, 8]
 y = x * 2      MulBackward0       other[]
 y = x.exp()    ExpBackward0       result[4, 8]</code></pre>
-    <table style="margin-top:14px">
+    <table class="mt-14">
       <tr><th>Operazione</th><th>Cosa trattiene, e perché</th></tr>
       <tr><td><code>x @ W</code></td><td><strong>Entrambi</strong> gli ingressi: <code>self</code> (=x) serve per <code>∂L/∂W</code>, <code>mat2</code> (=W) per <code>∂L/∂x</code>. Ma <code>W</code> è già un parametro persistente: <strong><code>x</code> è il costo nuovo.</strong></td></tr>
       <tr><td><code>relu(x)</code></td><td>Trattiene l'<strong>uscita</strong>, grande quanto l'ingresso. Concettualmente basterebbe sapere <em>dove</em> l'ingresso era positivo — un bit per elemento — ma l'implementazione tiene il tensore intero.</td></tr>
       <tr><td><code>x * 2</code></td><td>Solo lo scalare <code>2</code>, forma <code>[]</code>. <strong>Non trattiene <code>x</code>.</strong> La derivata è la costante 2: l'ingresso non serve. Costo nullo, per quanto grande sia <code>x</code>.</td></tr>
       <tr><td><code>x.exp()</code></td><td>L'uscita, perché la derivata di <code>eˣ</code> è <code>eˣ</code>: il risultato già calcolato <em>è</em> il gradiente locale.</td></tr>
     </table>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Se avevi risposto «relu trattiene solo il segno», hai ragione <em>in teoria</em> e torto <em>in pratica</em>: è la differenza fra cosa servirebbe e cosa l'implementazione fa. Distinzione che conta ogni volta che stimi la memoria.</p>
+    <p class="stacco">Se avevi risposto «relu trattiene solo il segno», hai ragione <em>in teoria</em> e torto <em>in pratica</em>: è la differenza fra cosa servirebbe e cosa l'implementazione fa. Distinzione che conta ogni volta che stimi la memoria.</p>
   </div>
 </details>
 
@@ -64,7 +64,7 @@ y = x.exp()    ExpBackward0       result[4, 8]</code></pre>
   <div class="mark">Nozione</div>
   <div class="body">
     <p>Mentre calcoli in avanti, PyTorch registra chi ha prodotto cosa. Ogni tensore non-foglia porta un <code>grad_fn</code>: l'operazione che l'ha generato.</p>
-    <pre style="margin:10px 0" data-lab="lab_07_1"><code>    x  shape=[4, 8]   requires_grad=True  grad_fn=FOGLIA
+    <pre class="m-10" data-lab="lab_07_1"><code>    x  shape=[4, 8]   requires_grad=True  grad_fn=FOGLIA
    W1  shape=[8, 16]  requires_grad=True  grad_fn=FOGLIA
     h  shape=[4, 16]  requires_grad=True  grad_fn=MmBackward0
     a  shape=[4, 16]  requires_grad=True  grad_fn=ReluBackward0
@@ -124,7 +124,7 @@ y = x.exp()    ExpBackward0       result[4, 8]</code></pre>
   <div class="mark">Dove il<br>«solo batch × seq»<br>è falso</div>
   <div class="body">
     <p>Quella intercambiabilità vale per la rete qui sopra, fatta di soli strati lineari. <strong>Non è una legge generale.</strong></p>
-    <pre style="margin:10px 0" data-lab="lab_07_1"><code> batch    seq  batch*seq   MB trattenuti
+    <pre class="m-10" data-lab="lab_07_1"><code> batch    seq  batch*seq   MB trattenuti
      1    128        128            1.70
      2    128        256            2.62
      1    256        256            3.15   ← non coincide con la riga sopra
@@ -175,7 +175,7 @@ y = x.exp()    ExpBackward0       result[4, 8]</code></pre>
     <p><strong>Ma non dedurlo da un errore di memoria.</strong> Un errore anche con <code>batch=1</code> <em>non prova</em> che il costo sia statico: con sequenze lunghe e attention quadratica un solo esempio può occupare moltissimo, e lì il checkpointing aiuta eccome.</p>
     <p><strong>E non puoi nemmeno misurarlo sulla GPU</strong>, per un motivo circolare: se il termine statico non ci sta, l'errore di memoria arriva <em>mentre</em> lo allochi, prima che tu possa leggerlo. E <code>memory_allocated()</code> non può per costruzione riportare un valore superiore alla capacità della scheda. Una misura sul dispositivo può confermare i casi che <em>ci stanno</em>, mai quantificare quelli che non ci stanno.</p>
     <p><strong>Il termine statico si calcola, non si misura</strong> — ed è esattamente quello che hai imparato a fare in M06, senza accendere una GPU:</p>
-    <pre style="margin:10px 0"><code>statico = parametri × byte_pesi
+    <pre class="m-10"><code>statico = parametri × byte_pesi
         + addestrabili × (byte_gradienti + byte_stati + byte_master)</code></pre>
     <p>I parametri li conti dal checkpoint come in M04, leggendo solo l'intestazione. Se quel numero supera già il tetto della GPU, hai la risposta senza aver lanciato niente: nessuna riduzione di batch o sequenza ti salverà, e devi cambiare metodo o partizionare (M18).</p>
     <p>Se invece lo statico ci sta con margine, il problema è nelle attivazioni: riduci la <strong>sequenza</strong>, che a differenza del batch può ancora scendere fino a poche decine di token, e verifica che l'errore sparisca. Quello è un test diretto ed eseguibile.</p>

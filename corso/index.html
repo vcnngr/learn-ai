@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Capire, addestrare, diagnosticare — corso</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="index">
 <div class="wrap">
@@ -32,7 +32,7 @@
   <div class="mark">Adattarlo<br>al tuo caso</div>
   <div class="body">
     <p>Hardware, modello di riferimento e caso di studio sono dichiarati in <code>assets/profilo.js</code>. Cambiando quei valori si aggiorna l'intestazione delle pagine, e i lab che accettano parametri — come il calcolatore di memoria di M06 — si eseguono sui tuoi numeri:</p>
-    <pre style="margin:10px 0"><code>python3 corso/labs/lab_06_1_memoria.py --params 8e9 --gpus 4 --hbm 80</code></pre>
+    <pre class="m-10"><code>python3 corso/labs/lab_06_1_memoria.py --params 8e9 --gpus 4 --hbm 80</code></pre>
     <p>Il campo che conta più di tutti è <code>regime</code>: GPU singola, più schede in un nodo, memoria unificata, cluster, noleggio. Non cambia i numeri — cambia <em>quale vincolo morde</em>, ed è il tema di <strong>M18b</strong>.</p>
     <p><strong>Quello che il profilo NON fa</strong>, ed è bene saperlo prima: <em>non riscrive i numeri già stampati nelle pagine</em>. I 54 GB, i 432 GB, le forme dei tensori e i conteggi LoRA restano quelli del profilo di riferimento — un denso da 27B su due schede da 141 GB. Vanno letti come <strong>un caso svolto</strong>: il metodo è tuo, i numeri sono suoi.</p>
     <p><strong>Quello che invece fa</strong>, da M06 in poi: accanto a ogni tabella di memoria compare il <em>tuo</em> ricalcolo, con le stesse formule del lab. Che le due strade coincidano non è un atto di fede — lo verifica <code>tools/parity_conti.py</code> a ogni rilascio, con uguaglianza esatta.</p>
@@ -45,7 +45,7 @@
     <p><strong>Con <em>N</em> schede da <em>M</em> GB non hai <em>N</em>×<em>M</em> GB di memoria. Hai <em>N</em> volte <em>M</em> GB, separate.</strong></p>
     <p>Un'interconnessione veloce rende rapido lo scambio di dati fra le schede. Non le fonde in un unico spazio di indirizzamento. Un modello che non sta in una scheda non «ci sta comunque»: va spezzato, e come lo spezzi cambia completamente il conto.</p>
     <p>È l'errore numero uno di chi arriva dall'infrastruttura, dove sommare le risorse di un pool è il gesto naturale. Qui non lo è, e nessun calcolo di capienza funziona finché quel riflesso non è disinnescato. I numeri arrivano in <strong>M06</strong>.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Con una eccezione, e riguarda alcuni di voi.</strong> Sulle macchine a <em>memoria unificata</em> — DGX Spark, Grace — il pool è davvero uno solo, condiviso fra CPU e acceleratore. Lì la somma non è sbagliata: è sbagliata la domanda. La capienza smette di essere il vincolo e comincia a esserlo la <strong>banda</strong>. È uno dei quattro regimi di <strong>M18b</strong>.</p>
+    <p class="stacco"><strong>Con una eccezione, e riguarda alcuni di voi.</strong> Sulle macchine a <em>memoria unificata</em> — DGX Spark, Grace — il pool è davvero uno solo, condiviso fra CPU e acceleratore. Lì la somma non è sbagliata: è sbagliata la domanda. La capienza smette di essere il vincolo e comincia a esserlo la <strong>banda</strong>. È uno dei quattro regimi di <strong>M18b</strong>.</p>
   </div>
 </div>
 

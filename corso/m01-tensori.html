@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M01 — Tensori: il mattone</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m01">
 <div class="wrap">
@@ -45,7 +45,7 @@
     <p><strong>1.</strong> Il risultato ha <strong>3 righe e 2 colonne</strong>. Le righe le eredita dalla prima tabella, le colonne dalla seconda.</p>
     <p><strong>2.</strong> Perché ogni riga della prima tabella (lunga 4) viene accoppiata con ogni colonna della seconda (alta 4), elemento per elemento, e i prodotti si sommano. Se le lunghezze non coincidono, gli elementi non si accoppiano: alcuni resterebbero senza partner.</p>
     <p><strong>3.</strong> Errore, immediato. Non produce un risultato sbagliato: proprio non parte.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px"><strong>Se hai risposto «non lo so»:</strong> perfetto, è il punto di partenza previsto. Tieni a mente solo questo, che è il 90% di tutte le forme che vedrai: <code>[3,4] @ [4,2] → [3,2]</code>. Il <strong>4</strong> centrale sparisce, i due esterni sopravvivono.</p>
+    <p class="stacco"><strong>Se hai risposto «non lo so»:</strong> perfetto, è il punto di partenza previsto. Tieni a mente solo questo, che è il 90% di tutte le forme che vedrai: <code>[3,4] @ [4,2] → [3,2]</code>. Il <strong>4</strong> centrale sparisce, i due esterni sopravvivono.</p>
   </div>
 </details>
 
@@ -191,7 +191,7 @@ targ = torch.zeros(32)         # 32 valori veri, riga
 print((pred - targ).shape)     # [32, 32]  ← non [32]</code></pre>
     <p>Volevi 32 differenze, ne hai ottenute 1024: ogni previsione confrontata con ogni valore vero. Nessun errore. La loss che ne esce è un numero perfettamente plausibile e completamente insensato, e l'addestramento «funziona» producendo risultati scadenti.</p>
     <p><strong>Quanto sei avvisato dipende da come scrivi la loss</strong>, e la differenza conta:</p>
-    <table style="margin:10px 0">
+    <table class="m-10">
       <tr><th>Come calcoli</th><th>Avviso?</th></tr>
       <tr><td><code>F.mse_loss(pred, targ)</code></td><td><strong>Sì.</strong> <code>UserWarning: Using a target size ... different to the input size ... will likely lead to incorrect results due to broadcasting</code></td></tr>
       <tr><td><code>(pred - targ).pow(2).mean()</code></td><td><strong>No.</strong> Nessun avviso possibile: qui il broadcasting è una funzionalità legittima, e nessuno sa che i due tensori dovrebbero corrispondere.</td></tr>
@@ -200,7 +200,7 @@ print((pred - targ).shape)     # [32, 32]  ← non [32]</code></pre>
     <p><strong>E c'è un secondo motivo per non fidarsi dell'avviso:</strong> Python stampa ogni warning una sola volta per default. Un <code>UserWarning</code> emesso al passo 0, in mezzo a migliaia di righe di log, non lo vede nessuno. Non è un allarme: è una nota a piè di pagina.</p>
     <p><strong>Difesa — e attenzione, quella ovvia non funziona.</strong> Guardare la forma della loss <em>non</em> rileva niente: le funzioni di loss riducono a uno scalare per default, quindi ottieni <code>[]</code> sia nel caso giusto sia in quello sbagliato. La riduzione nasconde il bug invece di rivelarlo.</p>
     <p>Quello che funziona è controllare le forme <strong>prima</strong> della riduzione:</p>
-    <pre style="margin:10px 0" data-lab="nessuno"><code>assert pred.shape == targ.shape, f"{pred.shape} != {targ.shape}"
+    <pre class="m-10" data-lab="nessuno"><code>assert pred.shape == targ.shape, f"{pred.shape} != {targ.shape}"
 
 # oppure, per vedere cosa sta davvero succedendo:
 d = torch.nn.functional.mse_loss(pred, targ, reduction="none")
@@ -250,7 +250,7 @@ print(a.data_ptr() == d.data_ptr())   # False → byte nuovi</code></pre>
     <p><strong>2.</strong> × 4 byte = <strong>67 108 864 byte</strong> = 67,1 MB (oppure esattamente 64 MiB).</p>
     <p><strong>3.</strong> <strong>Zero.</strong> È una vista: cambiano gli stride, non i byte.</p>
     <p><strong>4.</strong> <strong>Altri 67,1 MB.</strong> Copia vera.</p>
-    <p style="border-top:1px solid var(--rule); padding-top:12px; margin-top:14px">Nota il punto 2: hai appena fatto il conto che in M06 farai su un modello intero. <strong>Numero di parametri × byte per parametro.</strong> Per un modello da 27B in float32: 27·10⁹ × 4 = 108 GB, solo per i pesi, senza niente altro. Su una GPU da 141 GB. Comincia a intuirsi perché nessuno addestra in float32.</p>
+    <p class="stacco">Nota il punto 2: hai appena fatto il conto che in M06 farai su un modello intero. <strong>Numero di parametri × byte per parametro.</strong> Per un modello da 27B in float32: 27·10⁹ × 4 = 108 GB, solo per i pesi, senza niente altro. Su una GPU da 141 GB. Comincia a intuirsi perché nessuno addestra in float32.</p>
   </div>
 </details>
 

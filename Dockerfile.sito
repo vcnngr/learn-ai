@@ -12,6 +12,22 @@ FROM nginx:1.27-alpine
 COPY corso/*.html        /usr/share/nginx/html/
 COPY corso/assets/       /usr/share/nginx/html/assets/
 
+# VERSIONE negli URL degli asset, timbrata al build.
+#
+# Non e' ridondante col Cache-Control: davanti al cluster c'e'
+# Cloudflare, che RISCRIVE le intestazioni di cache dell'origine
+# (`no-cache` diventa `max-age=14400`) e serve la sua copia. Con URL
+# stabili una release puo' quindi accoppiare HTML nuovo e CSS vecchio —
+# ed e' successo davvero: le pagine sono uscite senza i separatori
+# perche' il CSS in cache non aveva ancora le classi nuove.
+#
+# Un URL diverso e' una risorsa diversa per qualunque cache, senza
+# dover chiedere il permesso a nessuno. Il sorgente in git resta
+# pulito: la marcatura esiste solo dentro l'immagine.
+ARG VERSIONE=dev
+COPY deploy/versiona-asset.sh /tmp/versiona-asset.sh
+RUN sh /tmp/versiona-asset.sh "$VERSIONE" && rm /tmp/versiona-asset.sh
+
 COPY deploy/nginx.conf   /etc/nginx/conf.d/default.conf
 
 # nginx:alpine gira gia' come non-root per i worker; il master ha

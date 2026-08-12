@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M00 — Come si usa questo corso</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m00">
 <div class="wrap">
@@ -38,7 +38,7 @@
 
 <h2>Come si legge una pagina</h2>
 
-<p>Cinque tipi di annotazione, sempre gli stessi, sempre con lo stesso significato. Il colore non è decorativo: <span style="color:var(--signal)"><strong>blu</strong></span> è ciò che è noto e strutturale, <span style="color:var(--delta)"><strong>rosso</strong></span> è lo scarto fra quello che credi e quello che è, <span style="color:var(--verify)"><strong>verde</strong></span> è ciò che hai eseguito e verificato.</p>
+<p>Cinque tipi di annotazione, sempre gli stessi, sempre con lo stesso significato. Il colore non è decorativo: <span class="c-signal"><strong>blu</strong></span> è ciò che è noto e strutturale, <span class="c-delta"><strong>rosso</strong></span> è lo scarto fra quello che credi e quello che è, <span class="c-verify"><strong>verde</strong></span> è ciò che hai eseguito e verificato.</p>
 
 <div class="note nozione">
   <div class="mark">Nozione</div>
@@ -93,7 +93,7 @@
 
 <h2>Il metodo, in una riga</h2>
 
-<p class="lede" style="font-family:var(--display); font-weight:700; font-size:1.2rem; line-height:1.5">Domanda → tuo tentativo → correzione con il perché dell'errore → teoria minima → esercizio sulle tue macchine.</p>
+<p class="lede evidenza">Domanda → tuo tentativo → correzione con il perché dell'errore → teoria minima → esercizio sulle tue macchine.</p>
 
 <p>Sempre in quest'ordine, con una sola eccezione: le <em>Nozioni</em>. Quando l'argomento è puramente convenzionale non c'è niente da inferire, e la do diretta.</p>
 

@@ -396,3 +396,40 @@ a.alloc-row:hover { background: var(--signal-wash); }
 }
 .tema-btn:hover { border-color: var(--signal); background: var(--signal-wash); }
 .tema-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* ---------------- utilità di spaziatura ----------------
+   Sostituiscono gli attributi style="..." inline.
+   Non e' pulizia formale: con `style-src 'self'` nella CSP del sito
+   ogni stile inline viene BLOCCATO dal browser, e le pagine servite
+   perdevano spaziature e separatori. Corretto spostandoli qui invece
+   di allargare la CSP con 'unsafe-inline'. */
+
+.m-10      { margin: 10px 0; }
+.m-0       { margin: 0; }
+.mt-10     { margin-top: 10px; }
+.mt-12     { margin-top: 12px; }
+.mt-14     { margin-top: 14px; }
+.mt-16     { margin-top: 16px; }
+.mt-18     { margin-top: 18px; }
+.mb-6      { margin-bottom: 6px; }
+.mb-8      { margin-bottom: 8px; }
+.no-bordo  { border: none; }
+.mt-14-nb  { margin-top: 14px; border: none; padding: 0; }
+
+/* Il separatore piu' usato del corso: stacca un caveat, una condizione
+   di validita' o una correzione dal corpo della risposta. Non e'
+   decorativo — segna un cambio di statuto di cio' che segue. */
+.stacco {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+
+.evidenza {
+  font-family: var(--display); font-weight: 700;
+  font-size: 1.2rem; line-height: 1.5;
+}
+.grande      { font-size: 1.05rem; }
+.c-signal    { color: var(--signal); }
+.c-delta     { color: var(--delta); }
+.c-verify    { color: var(--verify); }

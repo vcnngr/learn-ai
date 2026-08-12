@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M05 — Byte, dtype e precisione</title>
 <link rel="stylesheet" href="assets/style.css">
-<script>(function(){var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;})();</script>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="chiaro"||t==="scuro")document.documentElement.dataset.tema=t;}catch(e){}})();</script>
 </head>
 <body data-module="m05">
 <div class="wrap">
@@ -42,7 +42,7 @@
   <summary>Mostra la risposta</summary>
   <div class="risposta-inner">
     <p><strong>1.</strong> Perché spendono i loro 16 bit in modo <strong>opposto</strong>. Un numero in virgola mobile ha tre parti: segno, esponente (quanto grande o piccolo puoi essere — il <em>range</em>) e mantissa (quante cifre significative — la <em>precisione</em>).</p>
-    <pre style="margin:10px 0"><code>    dtype  byte  segno  esponente  mantissa
+    <pre class="m-10"><code>    dtype  byte  segno  esponente  mantissa
   float32     4      1          8        23
  bfloat16     2      1          8         7     ← range di fp32, precisione tagliata
   float16     2      1          5        10     ← più preciso, range molto ridotto</code></pre>
@@ -135,7 +135,7 @@
   <div class="body">
     <p><strong>TF32 è una modalità di calcolo, non un formato di memorizzazione.</strong> I valori restano <code>fp32</code> in memoria; è la moltiplicazione dentro i Tensor Core a usare una mantissa ridotta. Non cambia quanti byte occupa un tensore, e non troverai mai un tensore «di tipo tf32».</p>
     <p>È un interruttore. Come si chiami e se sia attivo per default dipende dalla versione: verificalo sul tuo stack invece di fidarti di questa pagina.</p>
-    <pre style="margin:10px 0"><code>torch.backends.cuda.matmul.allow_tf32
+    <pre class="m-10"><code>torch.backends.cuda.matmul.allow_tf32
 torch.backends.cudnn.allow_tf32</code></pre>
     <p><strong>Perché ti riguarda in diagnosi:</strong> due macchine con lo stesso codice e lo stesso dtype danno numeri leggermente diversi se questo interruttore differisce. È una delle cause di un controllo di parità (M02) che fallisce di poco senza motivo apparente.</p>
   </div>
