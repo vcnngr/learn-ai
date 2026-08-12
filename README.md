@@ -139,6 +139,38 @@ i valori misurati e trasformare «non verificato» in «verificabile da chiunque
 
 ---
 
+## Stato, e cosa manca
+
+Il corso è **online** su https://corso.vcnngr.it e ha superato tre revisioni
+esterne. Quello che resta aperto è scritto qui invece di essere scoperto dopo.
+
+| | Aperto | Perché non è chiuso |
+|---|---|---|
+| **Licenza** | manca il file `LICENSE` | un repo pubblico senza licenza è *tutti i diritti riservati*: va scelta, non dedotta |
+| **Generazione e decoding** | modulo mancante, +6 h | buco **verificato**: M20 usa `temperatura 0 (greedy)`, M15 mette `temperatura` nel manifest, e nessun modulo insegna il campionamento |
+| **Lente pedagogica** | prerequisiti concettuali | il grep trova quelli lessicali; quelli concettuali richiedono una lettura in sequenza |
+| **I due lab GPU** | mai eseguiti | serve CUDA. Il meccanismo per registrarli c'è (`--registra`), vedi `corso/AMBIENTI.md` |
+
+## Come è stato verificato, e cosa ha trovato
+
+Ogni gate del progetto deve dimostrare di **saper fallire**: si inietta un difetto
+e si verifica che il rapporto *nomini quello*, non che diventi genericamente
+rosso. `corso/tools/prova_i_gate.py` e `deploy/prova-la-prova.sh` fanno questo, e
+girano in CI prima dei controlli che verificano.
+
+Non è zelo. In una sola sessione di revisione esterna sono emersi nove difetti, e
+**sei erano negli strumenti di verifica**, non nel corso:
+
+- un gate di copertura che faceva `return 0` incondizionato mentre la CI lo
+  chiamava «controllo DURO»
+- un meta-test che dava verde senza aver visto la mutazione, perché guardava solo
+  il codice di uscita su una macchina dove il gate era già rosso
+- una prova che cercava «manca un'intestazione» invece di «manca *questa*»
+
+Il codice del corso era la parte solida. La parte fragile era quella che doveva
+controllarlo — ed è il motivo per cui la regola del progetto è che ogni cosa
+passi da una revisione indipendente.
+
 ## Struttura
 
 ```
