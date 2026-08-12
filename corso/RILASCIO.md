@@ -28,7 +28,10 @@ può fallire è peggio di nessun controllo, perché autorizza a non guardare.
 
 Per il gate del **sito** la prova corrispondente è `deploy/prova-la-prova.sh`:
 inietta un difetto vero — toglie `Referrer-Policy` — e verifica che il rapporto
-lo nomini, non solo che diventi rosso. Vive lì e non in `prova_i_gate.py` perché
+nomini **quella** intestazione, non che ne manchi genericamente una. La firma è
+la terna di colonne `1 1 0`: le prime due presenti, la terza no. Cercare la
+stringa «INTESTAZIONE MANCANTE» non bastava: un gate che avesse accusato il CSP
+al posto del `Referrer-Policy` sarebbe passato lo stesso. Vive lì e non in `prova_i_gate.py` perché
 ha bisogno di Docker, che nel container dei lab non c'è.
 
 `--riferimento` pretende verde anche il gate numerico. Usalo **solo qui**: quel gate
