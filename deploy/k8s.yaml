@@ -32,7 +32,7 @@ spec:
         - name: dockerhub-vcnngr
       containers:
         - name: nginx
-          image: docker.io/vcnngr/learn-ai-sito:v20260812-1221
+          image: docker.io/vcnngr/learn-ai-sito:v20260812-1231
           ports:
             - containerPort: 8080
               name: http

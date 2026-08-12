@@ -69,8 +69,42 @@ docker rmi -f learn-ai-sito:integra >/dev/null 2>&1 || true
 printf "  %-44s %s\n" "uscita a immagine integra (atteso 0)" "$ESITO2"
 printf "  %-44s %s\n" "a immagine integra tace" "$([ $TACE = 1 ] && echo si || echo NO)"
 
+# ----------------------------------------------------------------
+# E il gate degli invarianti di impaginazione?
+#
+# Stessa regola, stessa forma: iniettare il difetto e verificare che il
+# rapporto NOMINI quell'invariante, non che diventi genericamente rosso.
 echo ""
-if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2" = "0" ] && [ "$TACE" = "1" ]; then
+CSSF="corso/assets/style.css"
+BK2=$(mktemp); cp "$CSSF" "$BK2"
+# tolgo l'order: -1 del breakpoint, cioe' il difetto vero che una review
+# ha dovuto trovare: il comando che sotto i 980px torna in fondo
+sed 's/    order: -1;//' "$BK2" > "$CSSF"
+OUT3=$(python3 deploy/prova-layout.py 2>&1) && ESITO3=0 || ESITO3=$?
+cp "$BK2" "$CSSF"; rm -f "$BK2"
+
+# Il confronto va fatto sulla STESSA RIGA. Un glob come
+# *"colonna flex"*"MANCA"* combacia anche quando le due stringhe stanno
+# su righe diverse — «colonna flex ok» sopra e «MANCA» piu' sotto — e
+# accusava un invariante sano. E' la stessa imprecisione della firma
+# generica: cercare due cose vicine invece della cosa giusta.
+NOMINA3=0
+if printf '%s' "$OUT3" | grep "il piede va in testa" | grep -q "MANCA"; then NOMINA3=1; fi
+ALTRI3=0
+if printf '%s' "$OUT3" | grep -E "colonna flex|scorre l.indice|non si comprime" | grep -q "MANCA"; then ALTRI3=1; fi
+
+OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
+TACE4=1
+case "$OUT4" in *MANCA*) TACE4=0 ;; esac
+
+printf "  %-44s %s\n" "layout: uscita col difetto (atteso 1)" "$ESITO3"
+printf "  %-44s %s\n" "layout: nomina proprio order: -1" "$([ $NOMINA3 = 1 ] && echo si || echo NO)"
+printf "  %-44s %s\n" "layout: non accusa gli altri invarianti" "$([ $ALTRI3 = 0 ] && echo si || echo NO)"
+printf "  %-44s %s\n" "layout: a CSS integro tace" "$([ $TACE4 = 1 ] && [ $ESITO4 = 0 ] && echo si || echo NO)"
+
+echo ""
+if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2" = "0" ] && [ "$TACE" = "1" ] \
+   && [ "$ESITO3" = "1" ] && [ "$NOMINA3" = "1" ] && [ "$ALTRI3" = "0" ] && [ "$ESITO4" = "0" ] && [ "$TACE4" = "1" ]; then
   echo "Il gate vede il difetto e tace quando non c'e'."
   exit 0
 fi

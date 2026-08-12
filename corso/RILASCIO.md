@@ -61,6 +61,23 @@ che l'inclusione abbia funzionato ovunque.
 controllo a ogni push. Resta scritto qui perché va capito, e perché conviene
 lanciarlo in locale prima di pushare — ma non dipende più dal ricordarsene.
 
+## 0c. Gli invarianti di impaginazione
+
+```bash
+python3 deploy/prova-layout.py
+```
+
+Il comando del tema deve restare raggiungibile **senza scorrere** a entrambi i
+breakpoint: sopra i 980px è ancorato al piede di una colonna che scorre
+internamente, sotto quella struttura non esiste e il piede passa in testa.
+
+Serve perché una regressione qui è invisibile a ogni altro controllo — nessun
+gate numerico, nessuna intestazione, nessun test headless può vedere che un
+elemento è finito sotto la piega. È già successo due volte.
+
+Gira in CI nel job `sito`, e la prova che sa fallire è in
+`deploy/prova-la-prova.sh`.
+
 ## 1. Il gate numerico
 
 ```bash

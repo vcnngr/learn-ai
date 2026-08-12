@@ -381,7 +381,23 @@ a.alloc-row:hover { background: var(--signal-wash); }
 @media (max-width: 980px) {
   :root { --gutter: 0px; }
   .wrap { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--rule); }
+  /* Sotto i 980px la colonna non e' piu' una colonna: diventa un
+     blocco in cima alla pagina, alto quanto il suo contenuto. Il piede
+     quindi non e' ancorato a niente e tornerebbe DOPO l'intero indice —
+     cioe' il difetto che la struttura a tre zone aveva appena chiuso,
+     e su mobile pure peggio: la sidebar precede il contenuto, quindi
+     per trovarlo si scorrono 24 moduli e poi si torna su.
+     Qui il piede passa in TESTA (order: -1): una striscia di servizio
+     sopra la testata, visibile all'apertura senza scorrere nulla. */
+  .sidebar {
+    position: static; height: auto; overflow: visible;
+    border-right: none; border-bottom: 1px solid var(--rule);
+  }
+  .sidebar-inner { flex: none; min-height: auto; overflow: visible; padding-top: 22px; }
+  .sidebar-piede {
+    order: -1;
+    border-top: none; border-bottom: 1px solid var(--rule);
+  }
   main { padding: 30px 20px 90px; }
   h1 { font-size: 2.05rem; }
   .note { grid-template-columns: 1fr; gap: 0; }

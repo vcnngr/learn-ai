@@ -106,6 +106,14 @@ jobs:
       - name: Ogni risposta porta le intestazioni che deve portare
         run: sh deploy/prova-intestazioni.sh learn-ai-sito:ci
 
+      # Invarianti di impaginazione: il comando del tema deve restare
+      # raggiungibile a ENTRAMBI i breakpoint. Sopra i 980px e' ancorato
+      # al piede di una colonna che scorre internamente; sotto, quella
+      # struttura non esiste e il piede deve passare in testa. Una
+      # regressione qui e' invisibile a ogni altro controllo.
+      - name: Gli invarianti di impaginazione reggono a tutti i breakpoint
+        run: python3 deploy/prova-layout.py
+
   # ------------------------------------------------------------------
   # AMBIENTE RECENTE — quello che sulla macchina di scrittura NON si può
   # installare: su macOS x86 torch si ferma a 2.2.2.
