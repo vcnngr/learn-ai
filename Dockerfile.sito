@@ -27,6 +27,7 @@ COPY corso/assets/       /usr/share/nginx/html/assets/
 COPY deploy/versiona-asset.sh /tmp/versiona-asset.sh
 RUN sh /tmp/versiona-asset.sh && rm /tmp/versiona-asset.sh
 
+COPY deploy/intestazioni-sicurezza.conf /etc/nginx/intestazioni-sicurezza.conf
 COPY deploy/nginx.conf   /etc/nginx/conf.d/default.conf
 
 # nginx:alpine gira gia' come non-root per i worker; il master ha

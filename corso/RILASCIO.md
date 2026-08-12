@@ -33,6 +33,22 @@ Non è un'ipotesi: `verifica.py --copertura` faceva `return 0` incondizionato me
 la CI lo invocava dichiarandolo «controllo DURO». Se aggiungi un gate, aggiungi lì
 la prova che sa fallire.
 
+## 0b. Le intestazioni del sito
+
+```bash
+sh deploy/prova-intestazioni.sh vcnngr/learn-ai-sito:<tag>
+```
+
+Verifica che **ogni tipo di risposta** — pagina, asset, asset mancante, pagina
+mancante — porti CSP, `nosniff` e `Referrer-Policy`, e la politica di cache
+giusta. Esce 1 se una manca.
+
+Serve perché in nginx un `add_header` dentro un `location` **azzera** quelli
+ereditati dal `server`, e ripetere l'elenco a mano ha prodotto lo stesso difetto
+quattro volte di fila — tutte e quattro trovate da una review, nessuna da me.
+Ora le intestazioni stanno in un unico file incluso, e questo script controlla
+che l'inclusione abbia funzionato ovunque.
+
 ## 1. Il gate numerico
 
 ```bash
