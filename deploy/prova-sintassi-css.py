@@ -72,6 +72,19 @@ originale = CSS.read_text()
 
 print("Il gate legge il CSS come lo legge un browser?\n")
 
+# PRIMA di iniettare qualsiasi cosa: il gate deve essere verde sul CSS
+# come sta. Se e' gia' rosso, ogni iniezione successiva trova un rosso
+# che c'era prima, e l'intera prova non dimostra niente — e' il modo
+# esatto in cui una meta-prova diventa vacua.
+partenza = gate()
+if partenza.returncode != 0:
+    print("  PARTENZA GIA' ROSSA: il gate fallisce sul CSS integro.")
+    print("  Nessuna iniezione puo' dimostrare niente. Prima si aggiusta quello.\n")
+    for l in partenza.stdout.splitlines():
+        if "MANCA" in l or "ASSENTE" in l or "DETERMINABILE" in l:
+            print(f"  {l.strip()}")
+    sys.exit(1)
+
 falliti = 0
 try:
     for ancora, sost, riga, visto_atteso, etichetta in CASI:
@@ -82,20 +95,37 @@ try:
         CSS.write_text(originale.replace(ancora, sost, 1))
         r = gate()
         accusa = any(riga in l and "MANCA" in l for l in r.stdout.splitlines())
-        # non basta l'uscita 1: il gate deve NOMINARE la riga giusta,
-        # altrimenti un rosso per altra causa passa per prova riuscita
-        ok = (accusa and r.returncode == 1) if visto_atteso else not accusa
-        if ok:
-            esito = "visto" if visto_atteso else "tollerato"
+        if visto_atteso:
+            # non basta l'uscita 1: il gate deve NOMINARE la riga
+            # giusta, altrimenti un rosso per altra causa passa per
+            # prova riuscita
+            ok = accusa and r.returncode == 1
+            esito = "visto" if ok else "FALSO VERDE"
         else:
-            esito = "FALSO VERDE" if visto_atteso else "FALSO ROSSO"
+            # e per i tollerati non basta l'assenza di «MANCA»: serve
+            # il VERDE PIENO. Il gate ha altri tre modi di rifiutare —
+            # SELETTORE ASSENTE, NON DETERMINABILE, un invariante
+            # diverso — e nessuno dei tre contiene quella parola.
+            # Guardando solo «MANCA», un gate che rifiutava proprio la
+            # riga iniettata con NON DETERMINABILE risultava
+            # «tollerato». Verificato: falso verde pieno, uscita 0.
+            ok = r.returncode == 0
+            esito = "tollerato" if ok else "FALSO ROSSO"
+            if not ok and not accusa:
+                # dire QUALE rifiuto, se non e' quello ovvio
+                altre = [l.strip() for l in r.stdout.splitlines()
+                         if "DETERMINABILE" in l or "ASSENTE" in l]
+                if altre:
+                    esito += f" ({altre[0].split(':', 1)[-1].strip()[:40]})"
         print(f"  {etichetta:<28} {esito}")
         falliti += not ok
 finally:
     CSS.write_text(originale)
 
+# e il CSS ripristinato deve tornare verde: se il finally non avesse
+# rimesso il file com'era, tutto quanto sopra sarebbe da rifare
 integro = gate().returncode == 0
-print(f"\n  {'a CSS integro tace':<28} {'si' if integro else 'NO'}")
+print(f"\n  {'a CSS ripristinato tace':<28} {'si' if integro else 'NO'}")
 falliti += not integro
 
 print()

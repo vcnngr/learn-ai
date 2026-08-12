@@ -94,6 +94,14 @@ Tutte e tre le famiglie sono state trovate da una review, non da me, e tutte e
 tre confermate iniettandole prima di correggerle: il confronto letterale ne
 mancava quattro su cinque, poi due su due.
 
+**Un caso «tollerato» conta solo se il gate è verde pieno.** Il gate ha quattro
+modi di rifiutare — `MANCA`, `SELETTORE ASSENTE`, `NON DETERMINABILE`, un
+invariante diverso — e cercare solo la prima parola faceva passare per
+«tollerato» un gate che rifiutava proprio la riga iniettata. Ora si pretende
+uscita 0. E prima di iniettare qualsiasi cosa si verifica che il gate sia verde
+sul CSS come sta: partire da un rosso preesistente è il modo esatto in cui una
+meta-prova diventa vacua, ed è già successo con `prova_i_gate.py`.
+
 **Cosa il gate non decide, e lo dice.** Non valuta la specificità: farlo davvero
 significa scrivere un motore di cascata, che sarebbe una nuova fonte di difetti
 invece di un controllo. Quando trova un'altra regola il cui *soggetto* è lo
