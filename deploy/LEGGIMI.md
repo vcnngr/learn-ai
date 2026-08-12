@@ -40,6 +40,33 @@ che riscrive `Cache-Control` e se lo tiene per ore.
 Con nomi immutabili gli asset possono avere `max-age=31536000, immutable`: un URL
 identifica un contenuto e basta.
 
+**Gli errori non si mettono mai in cache.** `add_header` con `always` mette
+l'intestazione anche sulle risposte di **errore**: per un deploy, un 404 su un
+asset è uscito con `max-age=31536000, immutable` — cioè browser e CDN potevano
+tenersi il *fallimento* per un anno.
+
+È esattamente il caso del rollout, e rendeva falsa la proprietà su cui il digest
+si regge: il 404 non si sarebbe più risolto al ricarico, sarebbe diventato
+permanente. Peggio del CSS stantio che il digest doveva eliminare.
+
+Correzione: `Cache-Control` immutabile **senza** `always`, quindi solo sulle
+risposte riuscite; e un `error_page` che marca ogni errore `no-store`, perché un
+404 è uno stato del momento, non un contenuto.
+
+```
+asset esistente    public, max-age=31536000, immutable
+asset mancante     no-store
+pagina mancante    no-store
+```
+
+**Cloudflare ha l'ultima parola.** Le intestazioni dell'origine sono necessarie,
+non sufficienti: il bordo applica le proprie regole di zona, e serve copie
+cachate prima di una correzione. Dopo un cambio di questo tipo va purgata la
+cache CDN, altrimenti le vecchie risposte sopravvivono fino a scadenza. Nel
+nostro caso è rimasto in cache anche un 404 di prova su `style.deadbeef.css`,
+creato durante il collaudo: innocuo — nessuna pagina lo referenzia — ma è la
+dimostrazione concreta del meccanismo.
+
 **Cosa NON è risolto.** La finestra di rollout non è zero. `maxUnavailable: 0`
 la riduce al tempo che un pod vecchio impiega a uscire dal Service, ma in quei
 secondi una richiesta può ancora prendere 404 su un asset. È un compromesso
