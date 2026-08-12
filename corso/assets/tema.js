@@ -110,11 +110,19 @@
 
     segna(corrente);
 
-    // In alto, sotto l'intestazione. In fondo alla sidebar finiva sotto
-    // la piega: 24 moduli e 6 intestazioni superano i 100vh, e il
-    // comando era raggiungibile solo scorrendo tutto l'indice.
-    const sub = dove.querySelector(".brand-sub");
-    if (sub && sub.nextSibling) dove.insertBefore(gruppo, sub.nextSibling);
-    else dove.insertBefore(gruppo, dove.firstChild);
+    // AL PIEDE della sidebar, non dentro l'indice.
+    //
+    // Due posizioni sbagliate prima di questa, per ragioni opposte:
+    //   - in fondo a .sidebar-inner: sotto la piega, perche' 24 moduli
+    //     e 6 intestazioni superano i 100vh e l'indice scorre;
+    //   - sotto l'intestazione: sempre visibile ma INVADENTE, in mezzo
+    //     al blocco identita' e sul percorso che porta all'indice.
+    //
+    // Il piede e' fuori dall'area che scorre: sempre raggiungibile
+    // senza scorrere niente, e fuori dalla lettura.
+    const barra = document.createElement("div");
+    barra.className = "sidebar-piede";
+    barra.appendChild(gruppo);
+    (dove.parentElement || dove).appendChild(barra);
   });
 })();

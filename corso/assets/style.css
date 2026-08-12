@@ -94,13 +94,27 @@ body {
 
 .wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
 
+/* La sidebar e' una colonna con tre zone: identita' in alto, indice
+   che scorre in mezzo, comandi al piede. Lo scorrimento sta sull'indice
+   e NON sull'intera colonna: cosi' il piede resta appoggiato al bordo
+   inferiore invece di finire dopo 24 moduli, sotto la piega. */
 .sidebar {
   background: var(--paper-2);
   border-right: 1px solid var(--rule);
-  padding: 30px 0 60px;
-  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  position: sticky; top: 0; height: 100vh;
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.sidebar-inner { padding: 0 18px; }
+.sidebar-inner {
+  padding: 30px 18px 26px;
+  flex: 1; min-height: 0; overflow-y: auto;
+}
+/* Il piede: preferenze di visualizzazione, sempre raggiungibili e
+   fuori dal percorso di lettura che porta dal titolo all'indice. */
+.sidebar-piede {
+  flex: none; padding: 0 18px;
+  border-top: 1px solid var(--rule);
+  background: var(--paper-2);
+}
 
 .brand {
   display: block; text-decoration: none; color: var(--ink);
@@ -386,8 +400,7 @@ a.alloc-row:hover { background: var(--signal-wash); }
 
 .tema {
   display: flex; align-items: baseline; gap: 11px;
-  margin: 13px 0 0; padding-bottom: 13px;
-  border-bottom: 1px solid var(--rule);
+  padding: 11px 0 13px;
 }
 .tema-eti {
   font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
