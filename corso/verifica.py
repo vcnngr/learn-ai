@@ -294,6 +294,11 @@ def prosa(testo):
     """Testo della pagina SENZA i blocchi di codice, normalizzato."""
     t = re.sub(r"<pre[^>]*>.*?</pre>", " ", testo, flags=re.S)
     t = re.sub(r"<code[^>]*>.*?</code>", " ", t, flags=re.S)
+    # Il CONTENUTO di script e style non e' prosa. Togliere solo i tag
+    # lascerebbe il sorgente JS in mezzo al testo, e ogni sua costante
+    # numerica diventerebbe un "numero pubblicato" da giustificare.
+    t = re.sub(r"<script[^>]*>.*?</script>", " ", t, flags=re.S | re.I)
+    t = re.sub(r"<style[^>]*>.*?</style>", " ", t, flags=re.S | re.I)
     t = re.sub(r"<[^>]+>", " ", t)
     t = html.unescape(t)
     t = t.replace(" ", " ").replace(" ", " ").replace(" ", " ")

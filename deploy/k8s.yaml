@@ -1,0 +1,122 @@
+# Il corso, servito staticamente. Namespace default, come richiesto.
+#
+# Nessun PVC: il contenuto e' dentro l'immagine ed e' immutabile per
+# build. Aggiornare il sito significa costruire un tag nuovo, non
+# scrivere su un volume — cosi' quello che e' online corrisponde
+# sempre a un commit, ed e' la stessa disciplina del manifest di M15.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learn-ai
+  namespace: default
+  labels: { app: learn-ai }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: learn-ai }
+  template:
+    metadata:
+      labels: { app: learn-ai }
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-vcnngr
+      containers:
+        - name: nginx
+          image: docker.io/vcnngr/learn-ai-sito:v20260812-0832
+          ports:
+            - containerPort: 8080
+              name: http
+          # Sito statico: consuma pochissimo, e i limiti lo dichiarano
+          # invece di lasciarlo scoprire allo scheduler.
+          resources:
+            requests: { cpu: 10m,  memory: 24Mi }
+            limits:   { cpu: 200m, memory: 96Mi }
+          readinessProbe:
+            httpGet: { path: /index.html, port: http }
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /index.html, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101            # nginx, nell'immagine alpine
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          # Con rootfs in sola lettura nginx ha comunque bisogno di
+          # scrivere pid e cache temporanee: tmpfs, non un volume.
+          volumeMounts:
+            - { name: cache, mountPath: /var/cache/nginx }
+            - { name: run,   mountPath: /var/run }
+      volumes:
+        - name: cache
+          emptyDir: { medium: Memory, sizeLimit: 16Mi }
+        - name: run
+          emptyDir: { medium: Memory, sizeLimit: 4Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: learn-ai
+  namespace: default
+spec:
+  selector: { app: learn-ai }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: learn-ai
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: le-global-issuer
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: corso.vcnngr.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: learn-ai
+                port: { number: 80 }
+  tls:
+    - hosts: [corso.vcnngr.it]
+      secretName: learn-ai-tls
+---
+# Redirect http -> https.
+#
+# Serve un Ingress SEPARATO perche' traefik associa un router a un
+# entrypoint: quello sopra ascolta su `websecure`, questo su `web`.
+# Senza, http risponde 404 invece di rimandare a https — che e'
+# esattamente com'era al primo deploy.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: learn-ai-http
+  namespace: default
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: corso.vcnngr.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: learn-ai
+                port: { number: 80 }

@@ -1,0 +1,19 @@
+# Il SITO: solo pagine statiche.
+#
+# Niente Python, niente lab, niente torch. Sul cluster il corso non
+# esegue nulla: serve HTML, CSS e tre file JS che girano nel browser.
+# L'ambiente di riferimento dei LAB e' un'altra immagine (Dockerfile),
+# e le due non vanno confuse: quella pesa un giga, questa qualche mega.
+FROM nginx:1.27-alpine
+
+# Solo cio' che il browser chiede. I lab restano fuori di proposito:
+# non servono a servire il sito, e pubblicarli qui li esporrebbe come
+# se fossero scaricabili da web invece che da git.
+COPY corso/*.html        /usr/share/nginx/html/
+COPY corso/assets/       /usr/share/nginx/html/assets/
+
+COPY deploy/nginx.conf   /etc/nginx/conf.d/default.conf
+
+# nginx:alpine gira gia' come non-root per i worker; il master ha
+# bisogno di scrivere pid e cache temporanee, che restano in tmpfs.
+EXPOSE 8080

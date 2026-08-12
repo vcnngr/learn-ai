@@ -32,8 +32,14 @@
   --gutter: 132px;
 }
 
+/* TRE STATI, non due.
+   - nessun attributo  -> segue il sistema
+   - data-tema="chiaro" -> chiaro anche se il sistema e' scuro
+   - data-tema="scuro"  -> scuro anche se il sistema e' chiaro
+   Il :not() sulla media query serve a far vincere la scelta esplicita
+   dell'utente su quella del sistema, in entrambe le direzioni. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="chiaro"]) {
     --paper:    #0d1117;
     --paper-2:  #12171f;
     --panel:    #161c25;
@@ -50,6 +56,24 @@
     --verify:      #47c4a4;
     --verify-wash: #102b26;
   }
+}
+
+:root[data-tema="scuro"] {
+    --paper:    #0d1117;
+    --paper-2:  #12171f;
+    --panel:    #161c25;
+    --ink:      #dde4ed;
+    --ink-2:    #9caab9;
+    --ink-3:    #6a7684;
+    --rule:     #262e3a;
+    --rule-2:   #1e2530;
+
+    --signal:      #7d9dff;
+    --signal-wash: #172140;
+    --delta:       #ff8272;
+    --delta-wash:  #331a18;
+    --verify:      #47c4a4;
+    --verify-wash: #102b26;
 }
 
 * { box-sizing: border-box; }
@@ -351,3 +375,24 @@ a.alloc-row:hover { background: var(--signal-wash); }
   .note > .body { border-top-width: 2px; }
   .alloc-row { grid-template-columns: 40px 36px 1fr 52px; gap: 8px; }
 }
+
+/* ---------------- comando del tema ---------------- */
+
+.tema-box {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin: 30px 0 0; padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.tema-eti {
+  font-family: var(--mono); font-size: 0.635rem; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--ink-3);
+}
+.tema-btn {
+  font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em;
+  text-transform: uppercase; font-weight: 600;
+  color: var(--signal); background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: 3px 9px; cursor: pointer; min-width: 66px;
+}
+.tema-btn:hover { border-color: var(--signal); background: var(--signal-wash); }
+.tema-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
