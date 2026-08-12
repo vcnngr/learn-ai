@@ -164,6 +164,13 @@ IMPORTANTE=0
 if printf '%s' "$OUT9" | grep "non si comprime" | grep -q "flex vale '1'"; then IMPORTANTE=1; fi
 printf "  %-44s %s\n" "layout: !important prima di una normale" "$([ $ESITO9 = 1 ] && [ $IMPORTANTE = 1 ] && echo "vista" || echo NO)"
 
+# --- ottava: le forme valide di !important, in uno script a se' ---
+# Sta separato perche' inietta cinque varianti e le verifica una per
+# una: infilarlo qui dentro voleva dire annidare heredoc, che e' come
+# ci si sbaglia.
+python3 deploy/prova-important.py >/dev/null 2>&1 && VARIANTI=1 || VARIANTI=0
+printf "  %-44s %s\n" "layout: ogni forma valida di !important" "$([ $VARIANTI = 1 ] && echo si || echo NO)"
+
 OUT4=$(python3 deploy/prova-layout.py 2>&1) && ESITO4=0 || ESITO4=$?
 TACE4=1
 case "$OUT4" in *MANCA*) TACE4=0 ;; esac
@@ -180,7 +187,7 @@ if [ "$ESITO" = "1" ] && [ "$NOMINA" = "1" ] && [ "$ALTRE" = "0" ] && [ "$ESITO2
    && [ "$ESITO6" = "1" ] && [ "$SOTTOSTRINGA" = "1" ] \
    && [ "$ESITO7" = "1" ] && [ "$CASCATA" = "1" ] \
    && [ "$ESITO8" = "1" ] && [ "$SPECIF" = "1" ] \
-   && [ "$ESITO9" = "1" ] && [ "$IMPORTANTE" = "1" ]; then
+   && [ "$ESITO9" = "1" ] && [ "$IMPORTANTE" = "1" ] && [ "$VARIANTI" = "1" ]; then
   echo "Il gate vede il difetto e tace quando non c'e'."
   exit 0
 fi

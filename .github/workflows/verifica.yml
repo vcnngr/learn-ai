@@ -114,6 +114,12 @@ jobs:
       - name: Gli invarianti di impaginazione reggono a tutti i breakpoint
         run: python3 deploy/prova-layout.py
 
+      # `!important` si scrive in piu' modi validi — `! important`,
+      # `!IMPORTANT` — e un confronto letterale li manca tutti. Erano
+      # tre falsi verdi su tre varianti provate.
+      - name: Il gate riconosce !important in ogni forma valida
+        run: python3 deploy/prova-important.py
+
   # ------------------------------------------------------------------
   # AMBIENTE RECENTE — quello che sulla macchina di scrittura NON si può
   # installare: su macOS x86 torch si ferma a 2.2.2.

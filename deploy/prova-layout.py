@@ -106,8 +106,13 @@ def dichiarazioni(testo, selettore):
             k, _, v = d.partition(":")
             k = k.strip()
             v = " ".join(v.split())
-            imp = "!important" in v
-            v = v.replace("!important", "").strip()
+            # `!important` non si cerca come stringa letterale: la
+            # sintassi ammette spazio fra ! e important ed e'
+            # case-insensitive, quindi `! important` e `!IMPORTANT`
+            # sono validi e sfuggivano al confronto letterale — tre
+            # falsi verdi su tre varianti provate.
+            imp = re.search(r"!\s*important\b", v, re.I) is not None
+            v = re.sub(r"!\s*important\b", "", v, flags=re.I).strip()
             # una dichiarazione !important non si lascia sovrascrivere
             # da una normale, anche se questa viene dopo
             if props.get(k, (None, False))[1] and not imp:
